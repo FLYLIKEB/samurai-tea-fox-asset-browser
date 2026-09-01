@@ -13,6 +13,8 @@ from .image_ops import (
     ImageTk,
     crop_boxes_to_files,
     default_crop_output_path,
+    draw_pixel_line,
+    erase_pixel_line,
     flood_fill_image,
     make_edge_connected_color_transparent,
     normalize_crop_box,
@@ -47,6 +49,9 @@ class ImageCropWindow(tk.Toplevel):
         self.rect_id: int | None = None
         self.queued_rect_ids: list[int] = []
         self.tool_buttons: dict[str, tk.Button] = {}
+        self.last_draw_point: tuple[int, int] | None = None
+        self.line_start: tuple[int, int] | None = None
+        self.line_preview_id: int | None = None
         self.last_saved_path: Path | None = None
         self.image_id: int | None = None
         self.tool_mode = tk.StringVar(value="crop")
@@ -102,7 +107,10 @@ class ImageCropWindow(tk.Toplevel):
         )
         tool_rail.grid(row=0, column=0, sticky="ns", padx=(8, 4), pady=8)
         self.tool_buttons["crop"] = self._tool_button(tool_rail, "✂\n크롭\nV", self.use_crop_tool)
-        self.tool_buttons["paint"] = self._tool_button(tool_rail, "▣\n페인트\nP", self.use_paint_tool)
+        self.tool_buttons["pencil"] = self._tool_button(tool_rail, "✎\n펜\nB", self.use_pencil_tool)
+        self.tool_buttons["eraser"] = self._tool_button(tool_rail, "⌫\n지우개\nE", self.use_eraser_tool)
+        self.tool_buttons["line"] = self._tool_button(tool_rail, "╱\n직선\nL", self.use_line_tool)
+        self.tool_buttons["paint"] = self._tool_button(tool_rail, "▣\n채우기\nP", self.use_paint_tool)
         self.tool_buttons["eyedropper"] = self._tool_button(
             tool_rail,
             "⌖\n스포이드\nI",
@@ -212,6 +220,9 @@ class ImageCropWindow(tk.Toplevel):
         self.bind("<Return>", lambda _event: self.queue_current_box())
         self.bind("<space>", lambda _event: self.queue_current_box())
         self.bind("v", lambda _event: self.use_crop_tool())
+        self.bind("b", lambda _event: self.use_pencil_tool())
+        self.bind("e", lambda _event: self.use_eraser_tool())
+        self.bind("l", lambda _event: self.use_line_tool())
         self.bind("p", lambda _event: self.use_paint_tool())
         self.bind("i", lambda _event: self.use_eyedropper_tool())
         self.bind("t", lambda _event: self.apply_transparency())
@@ -326,6 +337,13 @@ class ImageCropWindow(tk.Toplevel):
             max(0, min(y, self.image_height)),
         )
 
+    def _to_pixel_point(self, event: tk.Event) -> tuple[int, int]:
+        x, y = self._to_original_point(event)
+        return (
+            min(x, self.image_width - 1),
+            min(y, self.image_height - 1),
+        )
+
     def _start_crop(self, event: tk.Event) -> None:
         if self.tool_mode.get() == "eyedropper":
             self.pick_color_at_event(event)
@@ -333,10 +351,22 @@ class ImageCropWindow(tk.Toplevel):
         if self.tool_mode.get() == "paint":
             self.paint_at_event(event)
             return
+        if self.tool_mode.get() in {"pencil", "eraser"}:
+            self.start_pixel_stroke(event)
+            return
+        if self.tool_mode.get() == "line":
+            self.start_line(event)
+            return
         self.start = self._to_original_point(event)
         self._set_box((*self.start, *self.start))
 
     def _drag_crop(self, event: tk.Event) -> None:
+        if self.tool_mode.get() in {"pencil", "eraser"}:
+            self.continue_pixel_stroke(event)
+            return
+        if self.tool_mode.get() == "line":
+            self.preview_line(event)
+            return
         if self.tool_mode.get() == "paint":
             self.paint_at_event(event)
             return
@@ -350,6 +380,12 @@ class ImageCropWindow(tk.Toplevel):
             self._set_box(box)
 
     def _finish_crop(self, event: tk.Event) -> None:
+        if self.tool_mode.get() in {"pencil", "eraser"}:
+            self.finish_pixel_stroke()
+            return
+        if self.tool_mode.get() == "line":
+            self.finish_line(event)
+            return
         if self.tool_mode.get() != "crop":
             return
         if self.start is None:
@@ -392,24 +428,50 @@ class ImageCropWindow(tk.Toplevel):
     def _tool_mode_label(self) -> str:
         return {
             "crop": "크롭",
-            "paint": "페인트",
+            "pencil": "펜",
+            "eraser": "지우개",
+            "line": "직선",
+            "paint": "채우기",
             "eyedropper": "스포이드",
         }.get(self.tool_mode.get(), self.tool_mode.get())
 
     def use_crop_tool(self) -> str:
         self.tool_mode.set("crop")
+        self.clear_line_preview()
+        self._refresh_tool_buttons()
+        self._show_box_status()
+        return "break"
+
+    def use_pencil_tool(self) -> str:
+        self.tool_mode.set("pencil")
+        self.clear_line_preview()
+        self._refresh_tool_buttons()
+        self._show_box_status()
+        return "break"
+
+    def use_eraser_tool(self) -> str:
+        self.tool_mode.set("eraser")
+        self.clear_line_preview()
+        self._refresh_tool_buttons()
+        self._show_box_status()
+        return "break"
+
+    def use_line_tool(self) -> str:
+        self.tool_mode.set("line")
         self._refresh_tool_buttons()
         self._show_box_status()
         return "break"
 
     def use_paint_tool(self) -> str:
         self.tool_mode.set("paint")
+        self.clear_line_preview()
         self._refresh_tool_buttons()
         self._show_box_status()
         return "break"
 
     def use_eyedropper_tool(self) -> str:
         self.tool_mode.set("eyedropper")
+        self.clear_line_preview()
         self._refresh_tool_buttons()
         self._show_box_status()
         return "break"
@@ -432,12 +494,96 @@ class ImageCropWindow(tk.Toplevel):
         self._show_box_status()
 
     def pick_color_at_event(self, event: tk.Event) -> str:
-        x, y = self._to_original_point(event)
-        point = (min(x, self.image_width - 1), min(y, self.image_height - 1))
+        point = self._to_pixel_point(event)
         red, green, blue, _alpha = self.original.getpixel(point)
         self.set_paint_color(self._rgb_to_hex((red, green, blue)))
         self.tool_mode.set("paint")
         self._refresh_tool_buttons()
+        self._show_box_status()
+        return "break"
+
+    def start_pixel_stroke(self, event: tk.Event) -> str:
+        point = self._to_pixel_point(event)
+        self.last_draw_point = point
+        self.apply_pixel_line(point, point)
+        return "break"
+
+    def continue_pixel_stroke(self, event: tk.Event) -> str:
+        point = self._to_pixel_point(event)
+        start = self.last_draw_point or point
+        self.apply_pixel_line(start, point)
+        self.last_draw_point = point
+        return "break"
+
+    def finish_pixel_stroke(self) -> str:
+        self.last_draw_point = None
+        return "break"
+
+    def start_line(self, event: tk.Event) -> str:
+        point = self._to_pixel_point(event)
+        self.line_start = point
+        self.preview_line(event)
+        return "break"
+
+    def preview_line(self, event: tk.Event) -> str:
+        if self.line_start is None:
+            return "break"
+        end = self._to_pixel_point(event)
+        coords = self._display_line_coords(self.line_start, end)
+        if self.line_preview_id is None:
+            self.line_preview_id = self.canvas.create_line(
+                *coords,
+                fill=SELECTED,
+                width=1,
+                dash=(3, 2),
+            )
+        else:
+            self.canvas.coords(self.line_preview_id, *coords)
+        self._show_box_status()
+        return "break"
+
+    def finish_line(self, event: tk.Event) -> str:
+        if self.line_start is None:
+            return "break"
+        start = self.line_start
+        end = self._to_pixel_point(event)
+        self.line_start = None
+        self.clear_line_preview()
+        self.apply_pixel_line(start, end)
+        return "break"
+
+    def clear_line_preview(self) -> None:
+        if self.line_preview_id is not None:
+            self.canvas.delete(self.line_preview_id)
+            self.line_preview_id = None
+        self.line_start = None
+
+    def _display_line_coords(
+        self,
+        start: tuple[int, int],
+        end: tuple[int, int],
+    ) -> tuple[float, float, float, float]:
+        return (
+            (start[0] + 0.5) * self.scale,
+            (start[1] + 0.5) * self.scale,
+            (end[0] + 0.5) * self.scale,
+            (end[1] + 0.5) * self.scale,
+        )
+
+    def apply_pixel_line(self, start: tuple[int, int], end: tuple[int, int]) -> str:
+        if self.tool_mode.get() == "eraser":
+            self.original, changed = erase_pixel_line(self.original, start, end)
+        else:
+            rgb = hex_to_rgb(self.paint_color_var.get())
+            if rgb is None:
+                messagebox.showerror("색상 오류", f"잘못된 색상입니다: {self.paint_color_var.get()}")
+                return "break"
+            self.original, changed = draw_pixel_line(self.original, start, end, (*rgb, 255))
+
+        self.last_changed_pixels = changed
+        if changed:
+            self.edit_dirty = True
+            self._render_image()
         self._show_box_status()
         return "break"
 

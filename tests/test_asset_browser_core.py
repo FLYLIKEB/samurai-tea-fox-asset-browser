@@ -478,6 +478,31 @@ class AssetBrowserCoreTest(unittest.TestCase):
         self.assertTrue(core.color_within_tolerance((250, 248, 245), (255, 255, 255), 10))
         self.assertFalse(core.color_within_tolerance((244, 248, 245), (255, 255, 255), 10))
 
+    def test_line_points_supports_diagonal_pixel_lines(self) -> None:
+        self.assertEqual(core.line_points((0, 0), (3, 2)), [(0, 0), (1, 1), (2, 1), (3, 2)])
+
+    @unittest.skipIf(core.Image is None, "Pillow is not installed")
+    def test_draw_pixel_line_colors_pixels(self) -> None:
+        image = core.Image.new("RGBA", (4, 1), (0, 0, 0, 0))
+
+        drawn, changed = core.draw_pixel_line(image, (0, 0), (2, 0), (1, 2, 3, 255))
+
+        self.assertEqual(changed, 3)
+        self.assertEqual(
+            [drawn.getpixel((x, 0)) for x in range(4)],
+            [(1, 2, 3, 255), (1, 2, 3, 255), (1, 2, 3, 255), (0, 0, 0, 0)],
+        )
+
+    @unittest.skipIf(core.Image is None, "Pillow is not installed")
+    def test_erase_pixel_line_clears_alpha(self) -> None:
+        image = core.Image.new("RGBA", (3, 1), (10, 20, 30, 255))
+
+        erased, changed = core.erase_pixel_line(image, (0, 0), (1, 0))
+
+        self.assertEqual(changed, 2)
+        self.assertEqual(erased.getpixel((0, 0)), (10, 20, 30, 0))
+        self.assertEqual(erased.getpixel((2, 0)), (10, 20, 30, 255))
+
     @unittest.skipIf(core.Image is None, "Pillow is not installed")
     def test_flood_fill_image_recolors_connected_region_only(self) -> None:
         image = core.Image.new("RGBA", (3, 2))

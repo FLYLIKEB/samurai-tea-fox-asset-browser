@@ -248,6 +248,66 @@ def color_within_tolerance(
 ) -> bool:
     return all(abs(pixel_rgb[index] - target_rgb[index]) <= tolerance for index in range(3))
 
+
+def line_points(start: tuple[int, int], end: tuple[int, int]) -> list[tuple[int, int]]:
+    x1, y1 = start
+    x2, y2 = end
+    dx = abs(x2 - x1)
+    dy = -abs(y2 - y1)
+    sx = 1 if x1 < x2 else -1
+    sy = 1 if y1 < y2 else -1
+    error = dx + dy
+    points: list[tuple[int, int]] = []
+
+    while True:
+        points.append((x1, y1))
+        if x1 == x2 and y1 == y2:
+            return points
+        doubled_error = 2 * error
+        if doubled_error >= dy:
+            error += dy
+            x1 += sx
+        if doubled_error <= dx:
+            error += dx
+            y1 += sy
+
+
+def draw_pixel_line(
+    image,
+    start: tuple[int, int],
+    end: tuple[int, int],
+    rgba: tuple[int, int, int, int],
+):
+    image = image.convert("RGBA")
+    width, height = image.size
+    pixels = image.load()
+    changed = 0
+    for x, y in line_points(start, end):
+        if x < 0 or y < 0 or x >= width or y >= height:
+            continue
+        if pixels[x, y] == rgba:
+            continue
+        pixels[x, y] = rgba
+        changed += 1
+    return image, changed
+
+
+def erase_pixel_line(image, start: tuple[int, int], end: tuple[int, int]):
+    image = image.convert("RGBA")
+    width, height = image.size
+    pixels = image.load()
+    changed = 0
+    for x, y in line_points(start, end):
+        if x < 0 or y < 0 or x >= width or y >= height:
+            continue
+        red, green, blue, alpha = pixels[x, y]
+        if alpha == 0:
+            continue
+        pixels[x, y] = (red, green, blue, 0)
+        changed += 1
+    return image, changed
+
+
 def make_color_transparent(image, rgb: tuple[int, int, int], tolerance: int = 0):
     image = image.convert("RGBA")
     tolerance = max(0, min(255, tolerance))

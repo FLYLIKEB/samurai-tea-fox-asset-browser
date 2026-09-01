@@ -18,7 +18,7 @@
 
 ## Personas and jobs
 - Primary personas: Solo developer/artist using Codex-assisted asset iteration.
-- User jobs: Select asset lists, inspect sprite sheets, crop variants, paint/fill small edits, apply palette/transparency changes.
+- User jobs: Select asset lists, inspect sprite sheets, crop variants, draw/erase/fill small edits, apply palette/transparency changes.
 - Key contexts of use: Local macOS development, many 32x32 sprites, frequent keyboard shortcuts.
 
 ## Information architecture
@@ -42,7 +42,7 @@
 ## Components
 - Existing components to reuse: `_button`, fixed grid cells, grouped headers, bottom panel tabs.
 - New/changed components: Main side action panels, image editor tool rail, image editor inspector panel.
-- Variants and states: Selected tool, dirty edit status, transparent/opaque asset badge.
+- Variants and states: Selected tool, dirty edit status, line preview, transparent/opaque asset badge.
 - Token/component ownership: `asset_browser/constants.py` owns colors; layout modules own placement.
 
 ## Accessibility
@@ -78,4 +78,4 @@
 - Test/screenshot expectations: Unit-test pure behavior; smoke-run Tk app after layout changes.
 
 ## Open questions
-- [ ] Whether the editor should eventually support true per-pixel pencil drawing instead of flood fill.
+- [ ] Whether the editor should support multi-pixel brush sizes beyond 1px.
