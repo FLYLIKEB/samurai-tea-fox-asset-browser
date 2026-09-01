@@ -22,13 +22,13 @@
 - Key contexts of use: Local macOS development, many 32x32 sprites, frequent keyboard shortcuts.
 
 ## Information architecture
-- Primary navigation: Scan path and filter at the top, grouped asset grid in the center, collapsible prompt/style panel at the bottom.
+- Primary navigation: Scan path and filter at the top, selection/copy/file actions on the left, grouped asset grid in the center, image operations on the right, collapsible prompt/style panel at the bottom.
 - Core routes/screens: Main browser, image detail editor.
 - Content hierarchy: Assets first, file actions second, prompt/style metadata last.
 
 ## Design principles
 - Principle 1: Group buttons by task sequence, not by implementation module.
-- Principle 2: Keep canvas and thumbnails dominant; controls stay compact and stable.
+- Principle 2: Keep canvas and thumbnails dominant; move secondary operations to side panels instead of stacking them above the grid.
 - Tradeoffs: Slightly more visible grouping is acceptable when it reduces accidental destructive edits.
 
 ## Visual language
@@ -41,7 +41,7 @@
 
 ## Components
 - Existing components to reuse: `_button`, fixed grid cells, grouped headers, bottom panel tabs.
-- New/changed components: Main action groups, image editor tool rail, image editor inspector panel.
+- New/changed components: Main side action panels, image editor tool rail, image editor inspector panel.
 - Variants and states: Selected tool, dirty edit status, transparent/opaque asset badge.
 - Token/component ownership: `asset_browser/constants.py` owns colors; layout modules own placement.
 
@@ -54,7 +54,7 @@
 
 ## Responsive behavior
 - Supported breakpoints/devices: macOS desktop windows down to the app min sizes.
-- Layout adaptations: Tool groups split into rows; image detail keeps tool rail and inspector fixed.
+- Layout adaptations: Main browser uses left/right side panels; image detail keeps tool rail and inspector fixed.
 - Touch/hover differences: Optimized for mouse/trackpad and keyboard.
 
 ## Interaction states

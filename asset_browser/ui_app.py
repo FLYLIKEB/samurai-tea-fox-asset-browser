@@ -108,7 +108,7 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
             self._set_status()
             return
 
-        width = max(self.canvas.winfo_width(), 720)
+        width = max(self.canvas.winfo_width(), 360)
         groups = self.grouped_images_for_render()
 
         max_columns = max(1, width // GRID_CELL_PITCH)
