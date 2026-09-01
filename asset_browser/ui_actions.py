@@ -17,6 +17,7 @@ from .image_ops import (
     apply_palette_to_images,
     apply_transparency_to_images,
     default_resize_output_path,
+    image_size,
     parse_image_size,
     resize_image_to_file,
 )
@@ -42,9 +43,16 @@ class ActionsMixin:
         self.images = find_images(root, self.project_root)
         self.image_by_path = {item.path: item for item in self.images}
         self.image_order_by_path = {item.path: index for index, item in enumerate(self.images)}
+        self.image_size_by_path = {item.path: self._read_image_size(item.path) for item in self.images}
         self.selected = {path for path in self.selected if path in {item.path for item in self.images}}
         self.apply_filter()
         self.update_prompt_preview(force=True)
+
+    def _read_image_size(self, path: Path) -> tuple[int, int] | None:
+        try:
+            return image_size(path)
+        except Exception:
+            return None
 
     def apply_filter(self) -> None:
         query = self.filter_var.get().strip().lower()

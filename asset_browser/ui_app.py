@@ -8,11 +8,18 @@ from pathlib import Path
 import tkinter as tk
 
 from .constants import BG, BORDER, ERROR, MUTED, SELECTED, SELECTED_TEXT, TEXT
-from .constants import GRID_CELL_HEIGHT, GRID_CELL_PITCH, GRID_CELL_WIDTH, THUMBNAIL_BOX_SIZE
+from .constants import GRID_CELL_PITCH
 from .image_ops import Image, ImageTk, recolor_image_to_palette
 from .models import AssetImage
 from .prompting import load_prompt_template
-from .scanner import group_images_by_folder
+from .scanner import folder_group_label
+from .sizing import (
+    cell_size_for_preview,
+    is_summary_size,
+    preview_size_for_image,
+    tile_size_group_label,
+    tile_size_sort_key,
+)
 from .style_tokens import extract_palette_colors
 from .ui_actions import ActionsMixin
 from .ui_layout import LayoutMixin
@@ -25,6 +32,7 @@ class AssetCellWidgets:
     image_label: tk.Label
     name_label: tk.Label
     detail_label: tk.Label
+    preview_error: bool
 
 class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
     def __init__(self, project_root: Path, asset_root: Path, scale: int) -> None:
@@ -48,6 +56,7 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         self.filtered_images: list[AssetImage] = []
         self.image_by_path: dict[Path, AssetImage] = {}
         self.image_order_by_path: dict[Path, int] = {}
+        self.image_size_by_path: dict[Path, tuple[int, int] | None] = {}
         self.selected: set[Path] = set()
         self.cell_widgets: dict[Path, AssetCellWidgets] = {}
         self.path_by_widget_id: dict[int, Path] = {}
@@ -96,18 +105,19 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
             return
 
         width = max(self.canvas.winfo_width(), 720)
-        columns = max(1, width // GRID_CELL_PITCH)
+        groups = self.grouped_images_for_render()
 
-        for column in range(columns):
+        max_columns = max(1, width // GRID_CELL_PITCH)
+        for column in range(max_columns):
             self.grid_frame.columnconfigure(column, minsize=GRID_CELL_PITCH, uniform="asset_cells")
 
         row = 0
-        for label, images in group_images_by_folder(
-            self.filtered_images,
-            self.asset_root,
-            self.project_root,
-        ):
+        for label, images in groups:
             expanded = label in self.expanded_group_labels
+            group_preview_size = self.preview_size_for_group(images)
+            group_cell_width, _group_cell_height = cell_size_for_preview(group_preview_size)
+            group_pitch = group_cell_width + 8
+            columns = max(1, width // group_pitch)
             self._add_group_header(label, len(images), row, columns, expanded)
             row += 1
             if not expanded:
@@ -146,14 +156,27 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
             widget.bind("<Button-1>", lambda _event, group_label=label: self.toggle_group(group_label))
 
     def current_group_labels(self) -> list[str]:
-        return [
-            label
-            for label, _images in group_images_by_folder(
-                self.filtered_images,
-                self.asset_root,
-                self.project_root,
-            )
-        ]
+        return [label for label, _images in self.grouped_images_for_render()]
+
+    def grouped_images_for_render(self) -> list[tuple[str, list[AssetImage]]]:
+        groups: dict[str, list[AssetImage]] = {}
+        sort_keys: dict[str, tuple[int, int, int, str]] = {}
+        for image in self.filtered_images:
+            size = self.image_size_by_path.get(image.path)
+            size_label = tile_size_group_label(size)
+            folder_label = folder_group_label(image, self.asset_root, self.project_root)
+            label = f"{size_label} / {folder_label}"
+            groups.setdefault(label, []).append(image)
+            sort_keys.setdefault(label, (*tile_size_sort_key(size), folder_label.lower()))
+        return sorted(groups.items(), key=lambda item: sort_keys[item[0]])
+
+    def preview_size_for_group(self, images: list[AssetImage]) -> tuple[int, int]:
+        if not images:
+            return 1, 1
+        return max(
+            (preview_size_for_image(self.image_size_by_path.get(item.path), self.scale_var.get()) for item in images),
+            key=lambda size: size[0] * size[1],
+        )
 
     def toggle_group(self, label: str) -> str:
         if label in self.expanded_group_labels:
@@ -167,6 +190,11 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         is_selected = item.path in self.selected
         bg, fg, meta_fg = self._cell_colors(is_selected)
 
+        source_size = self.image_size_by_path.get(item.path)
+        preview_size = preview_size_for_image(source_size, self.scale_var.get())
+        cell_width, cell_height = cell_size_for_preview(preview_size)
+        image_box_width, image_box_height = preview_size
+
         cell = tk.Frame(
             self.grid_frame,
             bg=bg,
@@ -174,8 +202,8 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
             pady=2,
             highlightthickness=0,
             highlightbackground=SELECTED if is_selected else BORDER,
-            width=GRID_CELL_WIDTH,
-            height=GRID_CELL_HEIGHT,
+            width=cell_width,
+            height=cell_height,
         )
         cell.grid(row=row, column=column, padx=3, pady=3, sticky="n")
         cell.grid_propagate(False)
@@ -183,17 +211,28 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         image_box = tk.Frame(
             cell,
             bg=bg,
-            width=THUMBNAIL_BOX_SIZE,
-            height=THUMBNAIL_BOX_SIZE,
+            width=image_box_width,
+            height=image_box_height,
         )
         image_box.pack(side=tk.TOP)
         image_box.pack_propagate(False)
 
         thumb, meta = self._load_thumbnail(item.path)
+        preview_error = False
         if thumb is not None:
             self.thumbnail_refs.append(thumb)
             image_label = tk.Label(image_box, image=thumb, bg=bg)
+        elif source_size is not None and is_summary_size(*source_size):
+            image_label = tk.Label(
+                image_box,
+                text="요약\n대형/시트",
+                bg=bg,
+                fg=meta_fg,
+                justify=tk.CENTER,
+                font=("TkDefaultFont", 9),
+            )
         else:
+            preview_error = True
             image_label = tk.Label(
                 image_box,
                 text="미리보기\n불가",
@@ -210,7 +249,7 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
             text=self._short_name(item.relative_path.name),
             bg=bg,
             fg=fg,
-            wraplength=124,
+            wraplength=max(124, cell_width - 8),
             justify=tk.CENTER,
             height=1,
             font=("TkDefaultFont", 10),
@@ -222,7 +261,7 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
             text=meta,
             bg=bg,
             fg=meta_fg,
-            wraplength=124,
+            wraplength=max(124, cell_width - 8),
             justify=tk.CENTER,
             font=("TkDefaultFont", 9),
             height=1,
@@ -242,6 +281,7 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
             image_label=image_label,
             name_label=name_label,
             detail_label=detail_label,
+            preview_error=preview_error,
         )
 
     def update_cell_selection(self, path: Path) -> None:
@@ -257,7 +297,7 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         widgets.name_label.configure(bg=bg, fg=fg)
         widgets.detail_label.configure(bg=bg, fg=meta_fg)
 
-        if not widgets.image_label.cget("image"):
+        if widgets.preview_error:
             widgets.image_label.configure(fg=ERROR if not is_selected else SELECTED_TEXT)
 
     def update_visible_selection_styles(self) -> None:
@@ -297,6 +337,12 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
 
     def _load_thumbnail(self, path: Path) -> tuple[tk.PhotoImage | None, str]:
         scale = max(1, self.scale_var.get())
+        known_size = self.image_size_by_path.get(path)
+        if known_size is not None and is_summary_size(*known_size):
+            width, height = known_size
+            tiles_wide = max(1, math.ceil(width / 32))
+            tiles_high = max(1, math.ceil(height / 32))
+            return None, f"{width}x{height} | {tiles_wide}x{tiles_high}타일"
 
         if Image is not None and ImageTk is not None:
             try:
@@ -343,12 +389,7 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
             return None, f"읽기 오류: {exc.__class__.__name__}"
 
     def _scaled_size(self, width: int, height: int, scale: int) -> tuple[int, int]:
-        max_dimension = max(width, height)
-        if max_dimension <= 0:
-            return 1, 1
-
-        fit_scale = min(float(scale), THUMBNAIL_BOX_SIZE / max_dimension)
-        return max(1, int(width * fit_scale)), max(1, int(height * fit_scale))
+        return preview_size_for_image((width, height), scale)
 
     def _short_name(self, name: str) -> str:
         if len(name) <= 20:

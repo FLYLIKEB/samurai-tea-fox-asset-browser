@@ -44,19 +44,32 @@ class AssetBrowserCoreTest(unittest.TestCase):
         browser = core.AssetBrowser.__new__(core.AssetBrowser)
         browser.project_root = Path("/project")
         browser.asset_root = browser.project_root / "assets"
-        browser.filtered_images = [
-            core.AssetImage(browser.project_root / "assets" / "sprites" / "fox.png", Path("assets/sprites/fox.png")),
-            core.AssetImage(browser.project_root / "assets" / "tiles" / "grass.png", Path("assets/tiles/grass.png")),
-        ]
+        fox = core.AssetImage(
+            browser.project_root / "assets" / "sprites" / "fox.png",
+            Path("assets/sprites/fox.png"),
+        )
+        grass = core.AssetImage(
+            browser.project_root / "assets" / "tiles" / "grass.png",
+            Path("assets/tiles/grass.png"),
+        )
+        browser.filtered_images = [fox, grass]
+        browser.image_size_by_path = {fox.path: (32, 64), grass.path: (32, 32)}
 
-        self.assertEqual(browser.current_group_labels(), ["sprites", "tiles"])
+        self.assertEqual(browser.current_group_labels(), ["32x32 / tiles", "32x64 / sprites"])
 
     def test_thumbnail_scale_keeps_32px_assets_at_4x_inside_128px_box(self) -> None:
         scaled_size = core.AssetBrowser._scaled_size
 
         self.assertEqual(scaled_size(None, 32, 32, 4), (128, 128))
-        self.assertEqual(scaled_size(None, 64, 64, 4), (128, 128))
-        self.assertEqual(scaled_size(None, 128, 64, 4), (128, 64))
+        self.assertEqual(scaled_size(None, 32, 64, 4), (128, 256))
+        self.assertEqual(scaled_size(None, 64, 64, 4), core.SUMMARY_PREVIEW_SIZE)
+
+    def test_tile_size_group_labels_large_images_as_summary(self) -> None:
+        self.assertEqual(core.tile_size_group_label((32, 32)), "32x32")
+        self.assertEqual(core.tile_size_group_label((32, 64)), "32x64")
+        self.assertEqual(core.tile_size_group_label((64, 64)), "대형/시트 (64x64 이상)")
+        self.assertEqual(core.tile_size_group_label((32, 128)), "긴 시트 (128px 이상)")
+        self.assertEqual(core.tile_size_group_label((48, 32)), "기타 48x32")
 
     def test_toggle_selection_updates_only_one_cell_without_grid_render(self) -> None:
         browser = core.AssetBrowser.__new__(core.AssetBrowser)
