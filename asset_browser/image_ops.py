@@ -144,11 +144,19 @@ def resize_image_to_file(source: Path, target: Path, size: tuple[int, int]) -> N
         resized = opened.convert("RGBA").resize(size, resampling.NEAREST)
         resized.save(target)
 
-def make_color_transparent(image, rgb: tuple[int, int, int]):
+def color_within_tolerance(
+    pixel_rgb: tuple[int, int, int],
+    target_rgb: tuple[int, int, int],
+    tolerance: int,
+) -> bool:
+    return all(abs(pixel_rgb[index] - target_rgb[index]) <= tolerance for index in range(3))
+
+def make_color_transparent(image, rgb: tuple[int, int, int], tolerance: int = 0):
     image = image.convert("RGBA")
+    tolerance = max(0, min(255, tolerance))
     transparent = []
     for red, green, blue, alpha in image.getdata():
-        if alpha > 0 and (red, green, blue) == rgb:
+        if alpha > 0 and color_within_tolerance((red, green, blue), rgb, tolerance):
             transparent.append((red, green, blue, 0))
         else:
             transparent.append((red, green, blue, alpha))
@@ -157,12 +165,12 @@ def make_color_transparent(image, rgb: tuple[int, int, int]):
     converted.putdata(transparent)
     return converted
 
-def save_color_transparent_image(path: Path, rgb: tuple[int, int, int]) -> None:
+def save_color_transparent_image(path: Path, rgb: tuple[int, int, int], tolerance: int = 0) -> None:
     if Image is None:
         raise RuntimeError("배경 투명화에는 Pillow가 필요합니다.")
 
     with Image.open(path) as opened:
-        converted = make_color_transparent(opened, rgb)
+        converted = make_color_transparent(opened, rgb, tolerance)
         converted.save(path)
 
 def apply_transparency_to_images(
@@ -170,6 +178,7 @@ def apply_transparency_to_images(
     rgb: tuple[int, int, int],
     project_root: Path,
     backup_root: Path,
+    tolerance: int = 0,
 ) -> tuple[int, list[str]]:
     converted = 0
     failures: list[str] = []
@@ -179,7 +188,7 @@ def apply_transparency_to_images(
             backup_path = backup_root / relative_or_name(path, project_root)
             backup_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(path, backup_path)
-            save_color_transparent_image(path, rgb)
+            save_color_transparent_image(path, rgb, tolerance)
             converted += 1
         except Exception as exc:
             failures.append(f"{path}: {exc}")

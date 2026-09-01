@@ -54,7 +54,7 @@ class AssetBrowserCoreTest(unittest.TestCase):
         browser.selected = set()
         browser.update_cell_selection = lambda path: calls.append(f"cell:{path.name}")
         browser._set_status = lambda: calls.append("status")
-        browser.update_prompt_preview = lambda: calls.append("prompt")
+        browser.schedule_prompt_preview_update = lambda: calls.append("prompt")
         browser.render_grid = lambda: self.fail("selection should not rebuild the full grid")
 
         browser.toggle_selection(asset)
@@ -215,6 +215,22 @@ class AssetBrowserCoreTest(unittest.TestCase):
         self.assertEqual(
             list(converted.getdata()),
             [(255, 255, 255, 0), (255, 255, 255, 0), (1, 2, 3, 255)],
+        )
+
+    def test_color_within_tolerance_checks_each_rgb_channel(self) -> None:
+        self.assertTrue(core.color_within_tolerance((250, 248, 245), (255, 255, 255), 10))
+        self.assertFalse(core.color_within_tolerance((244, 248, 245), (255, 255, 255), 10))
+
+    @unittest.skipIf(core.Image is None, "Pillow is not installed")
+    def test_make_color_transparent_supports_tolerance(self) -> None:
+        image = core.Image.new("RGBA", (2, 1))
+        image.putdata([(250, 248, 245, 255), (230, 248, 245, 255)])
+
+        converted = core.make_color_transparent(image, (255, 255, 255), tolerance=10)
+
+        self.assertEqual(
+            list(converted.getdata()),
+            [(250, 248, 245, 0), (230, 248, 245, 255)],
         )
 
 if __name__ == "__main__":

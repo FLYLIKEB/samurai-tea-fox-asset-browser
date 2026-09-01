@@ -34,6 +34,7 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         self.scale_var = tk.IntVar(value=scale)
         self.resize_size_var = tk.StringVar(value="32x32")
         self.transparent_color_var = tk.StringVar(value="#ffffff")
+        self.transparent_tolerance_var = tk.IntVar(value=32)
         self.palette_preview_var = tk.BooleanVar(value=False)
         self.bottom_panel_visible = tk.BooleanVar(value=False)
         self.filter_var = tk.StringVar()
@@ -45,6 +46,7 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         self.image_order_by_path: dict[Path, int] = {}
         self.selected: set[Path] = set()
         self.cell_widgets: dict[Path, AssetCellWidgets] = {}
+        self.path_by_widget_id: dict[int, Path] = {}
         self.thumbnail_refs: list[tk.PhotoImage] = []
         self.prompt_template = load_prompt_template(project_root)
         self.art_style_data: dict | None = None
@@ -54,8 +56,11 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         self.updating_prompt = False
         self.updating_template = False
         self.pending_click_after_id: str | None = None
+        self.pending_prompt_after_id: str | None = None
         self.suppress_single_click_until = 0.0
         self.scroll_remainder = 0.0
+        self.drag_selecting = False
+        self.drag_seen_paths: set[Path] = set()
 
         self.title("무사여우 에셋 브라우저")
         self.geometry("1360x940")
@@ -70,6 +75,7 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
             child.destroy()
         self.thumbnail_refs.clear()
         self.cell_widgets.clear()
+        self.path_by_widget_id.clear()
 
         if not self.filtered_images:
             tk.Label(
@@ -187,7 +193,10 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
 
         for widget in (cell, image_box, image_label, name_label, detail_label):
             widget.bind("<Button-1>", lambda _event, asset=item: self.schedule_toggle_selection(asset))
+            widget.bind("<B1-Motion>", lambda _event, asset=item: self.begin_drag_selection(asset))
+            widget.bind("<Enter>", lambda event, asset=item: self.extend_drag_selection(event, asset))
             widget.bind("<Double-Button-1>", lambda _event, asset=item: self.open_crop_or_copy_prompt(asset))
+            self.path_by_widget_id[id(widget)] = item.path
 
         self.cell_widgets[item.path] = AssetCellWidgets(
             cell=cell,
@@ -216,6 +225,15 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
     def update_visible_selection_styles(self) -> None:
         for path in self.cell_widgets:
             self.update_cell_selection(path)
+
+    def asset_under_pointer(self) -> AssetImage | None:
+        widget = self.winfo_containing(self.winfo_pointerx(), self.winfo_pointery())
+        while widget is not None:
+            path = self.path_by_widget_id.get(id(widget))
+            if path is not None:
+                return self.image_by_path.get(path)
+            widget = widget.master
+        return None
 
     def _cell_colors(self, is_selected: bool) -> tuple[str, str, str]:
         bg = SELECTED if is_selected else BG

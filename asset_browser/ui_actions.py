@@ -62,7 +62,46 @@ class ActionsMixin:
             self.selected.add(asset.path)
         self.update_cell_selection(asset.path)
         self._set_status()
-        self.update_prompt_preview()
+        self.schedule_prompt_preview_update()
+
+    def select_asset_fast(self, asset: AssetImage) -> None:
+        if asset.path in self.selected:
+            return
+        self.selected.add(asset.path)
+        self.update_cell_selection(asset.path)
+        self._set_status()
+        self.schedule_prompt_preview_update()
+
+    def begin_drag_selection(self, asset: AssetImage) -> str:
+        pending_id = self.pending_click_after_id
+        if pending_id is not None:
+            self.after_cancel(pending_id)
+            self.pending_click_after_id = None
+        self.drag_selecting = True
+        self.drag_seen_paths.clear()
+        self.select_asset_fast(asset)
+        self.drag_seen_paths.add(asset.path)
+        return "break"
+
+    def extend_drag_selection(self, event: tk.Event, asset: AssetImage) -> str:
+        if not self.drag_selecting and not (event.state & 0x0100):
+            return "break"
+        self.drag_selecting = True
+        if asset.path not in self.drag_seen_paths:
+            self.select_asset_fast(asset)
+            self.drag_seen_paths.add(asset.path)
+        self.autoscroll_during_drag(event)
+        return "break"
+
+    def end_drag_selection(self, _event: tk.Event | None = None) -> str:
+        self.drag_selecting = False
+        self.drag_seen_paths.clear()
+        return "break"
+
+    def select_asset_under_pointer(self) -> None:
+        asset = self.asset_under_pointer()
+        if asset is not None:
+            self.select_asset_fast(asset)
 
     def schedule_toggle_selection(self, asset: AssetImage) -> str:
         if time.monotonic() < self.suppress_single_click_until:
@@ -85,13 +124,13 @@ class ActionsMixin:
         self.selected.update(item.path for item in self.filtered_images)
         self.update_visible_selection_styles()
         self._set_status()
-        self.update_prompt_preview()
+        self.schedule_prompt_preview_update()
 
     def clear_selection(self) -> None:
         self.selected.clear()
         self.update_visible_selection_styles()
         self._set_status()
-        self.update_prompt_preview()
+        self.schedule_prompt_preview_update()
 
     def selected_assets(self) -> list[AssetImage]:
         return [
@@ -203,6 +242,16 @@ class ActionsMixin:
         else:
             prompt = "이미지를 선택하면 여기에 복사될 Codex 프롬프트가 표시됩니다.\n"
         self.set_prompt_text(prompt, dirty=False)
+
+    def schedule_prompt_preview_update(self) -> None:
+        pending_id = self.pending_prompt_after_id
+        if pending_id is not None:
+            self.after_cancel(pending_id)
+        self.pending_prompt_after_id = self.after(120, self._run_scheduled_prompt_update)
+
+    def _run_scheduled_prompt_update(self) -> None:
+        self.pending_prompt_after_id = None
+        self.update_prompt_preview()
 
     def set_prompt_text(self, text: str, dirty: bool) -> None:
         self.updating_prompt = True
@@ -378,10 +427,12 @@ class ActionsMixin:
             messagebox.showerror("색상 오류", f"잘못된 색상입니다: {self.transparent_color_var.get()}")
             return
 
+        tolerance = self.transparent_tolerance_var.get()
         backup_root = palette_backup_root(self.project_root)
         ok = messagebox.askokcancel(
             "배경 투명화 확인",
-            f"선택한 이미지 {len(assets)}개에서 {color} 색상을 투명으로 실제 변경합니다.\n\n"
+            f"선택한 이미지 {len(assets)}개에서 {color} 주변 색상을 투명으로 실제 변경합니다.\n"
+            f"허용 범위: 채널별 ±{tolerance}\n\n"
             f"백업 위치: {backup_root}\n\n계속할까요?",
         )
         if not ok:
@@ -392,12 +443,15 @@ class ActionsMixin:
             rgb,
             self.project_root,
             backup_root,
+            tolerance,
         )
         self.rescan()
         if failures:
             self._copy_text("\n".join(failures) + "\n", "투명화 실패 목록")
             messagebox.showwarning("일부 투명화 실패", f"{converted}개 변환, {len(failures)}개 실패")
-        self.status_var.set(f"배경 투명화 완료: {converted}개 | 색상 {color} | 백업: {backup_root}")
+        self.status_var.set(
+            f"배경 투명화 완료: {converted}개 | 색상 {color} | 범위 {tolerance} | 백업: {backup_root}"
+        )
 
     def _copy_lines(self, lines: list[str], label: str) -> None:
         if not lines:

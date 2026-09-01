@@ -66,11 +66,11 @@ class ImageCropWindow(tk.Toplevel):
             anchor="w",
         ).pack(side=tk.LEFT, fill=tk.X, expand=True)
 
-        self._button(header, "초기화", self.clear_queued_boxes).pack(side=tk.RIGHT, padx=(6, 0))
-        self._button(header, "모두 저장", self.save_all_crops).pack(side=tk.RIGHT, padx=(6, 0))
-        self._button(header, "영역 추가", self.queue_current_box).pack(side=tk.RIGHT, padx=(6, 0))
-        self._button(header, "저장", self.save_crop).pack(side=tk.RIGHT, padx=(6, 0))
-        self._button(header, "32x32 맞춤", self.fit_32).pack(side=tk.RIGHT, padx=(6, 0))
+        self._button(header, "× 초기화 (C)", self.clear_queued_boxes).pack(side=tk.RIGHT, padx=(6, 0))
+        self._button(header, "◆ 모두 저장 (⇧⌘S)", self.save_all_crops).pack(side=tk.RIGHT, padx=(6, 0))
+        self._button(header, "+ 영역 추가 (Space)", self.queue_current_box).pack(side=tk.RIGHT, padx=(6, 0))
+        self._button(header, "◆ 저장 (⌘S)", self.save_crop).pack(side=tk.RIGHT, padx=(6, 0))
+        self._button(header, "□ 32x32 (X)", self.fit_32).pack(side=tk.RIGHT, padx=(6, 0))
 
         info = tk.Label(self, textvariable=self.info_var, bg=BG, fg=MUTED, anchor="w", padx=10, pady=5)
         info.pack(side=tk.TOP, fill=tk.X)
@@ -95,8 +95,12 @@ class ImageCropWindow(tk.Toplevel):
         self.bind("<Escape>", lambda _event: self.destroy())
         self.bind("<Return>", lambda _event: self.queue_current_box())
         self.bind("<space>", lambda _event: self.queue_current_box())
+        self.bind("x", lambda _event: self.fit_32())
+        self.bind("c", lambda _event: self.clear_queued_boxes())
         self.bind("<Command-s>", lambda _event: self.save_shortcut())
+        self.bind("<Command-Shift-s>", lambda _event: self.save_all_crops())
         self.bind("<Control-s>", lambda _event: self.save_shortcut())
+        self.bind("<Control-Shift-s>", lambda _event: self.save_all_crops())
 
     def _button(self, parent: tk.Widget, text: str, command) -> tk.Button:
         return tk.Button(
@@ -217,8 +221,6 @@ class ImageCropWindow(tk.Toplevel):
         return "break"
 
     def save_shortcut(self) -> str:
-        if self.queued_boxes:
-            return self.save_all_crops()
         return self.save_crop()
 
     def save_crop(self) -> str:

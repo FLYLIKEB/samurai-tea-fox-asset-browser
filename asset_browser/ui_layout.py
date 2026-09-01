@@ -40,9 +40,9 @@ class LayoutMixin:
         path_entry = tk.Entry(toolbar, textvariable=self.path_var, bg=BG, fg=TEXT, relief=tk.FLAT)
         path_entry.grid(row=0, column=0, sticky="ew", padx=(0, 6))
 
-        self._button(toolbar, "찾기", self.choose_root).grid(row=0, column=1, padx=1)
-        self._button(toolbar, "새로고침", self.rescan).grid(row=0, column=2, padx=1)
-        self._button(toolbar, "Finder에서 폴더 보기", self.reveal_asset_root).grid(
+        self._button(toolbar, "⌕ 찾기 (⌘O)", self.choose_root).grid(row=0, column=1, padx=1)
+        self._button(toolbar, "↻ 새로고침 (⌘R)", self.rescan).grid(row=0, column=2, padx=1)
+        self._button(toolbar, "⌂ Finder (⌘F)", self.reveal_asset_root).grid(
             row=0, column=3, padx=(1, 8)
         )
         filter_entry = tk.Entry(
@@ -67,31 +67,32 @@ class LayoutMixin:
         actions = tk.Frame(self, bg=BG, padx=8, pady=5)
         actions.pack(side=tk.TOP, fill=tk.X)
 
-        self._button(actions, "전체", self.select_all).pack(side=tk.LEFT, padx=(0, 4))
-        self._button(actions, "해제", self.clear_selection).pack(side=tk.LEFT, padx=(0, 4))
-        self._button(actions, "삭제", self.delete_selected_images).pack(side=tk.LEFT, padx=(0, 8))
-        self._button(actions, "상대경로", self.copy_relative_paths).pack(side=tk.LEFT, padx=(0, 4))
-        self._button(actions, "절대경로", self.copy_absolute_paths).pack(side=tk.LEFT, padx=(0, 4))
-        self._button(actions, "프롬프트", self.copy_codex_prompt).pack(
+        self._button(actions, "✓ 전체 (⌘A)", self.select_all).pack(side=tk.LEFT, padx=(0, 4))
+        self._button(actions, "× 해제 (Esc)", self.clear_selection).pack(side=tk.LEFT, padx=(0, 4))
+        self._button(actions, "⌫ 삭제 (Del)", self.delete_selected_images).pack(side=tk.LEFT, padx=(0, 8))
+        self._button(actions, "⇄ 상대 (⌘1)", self.copy_relative_paths).pack(side=tk.LEFT, padx=(0, 4))
+        self._button(actions, "⛓ 절대 (⌘2)", self.copy_absolute_paths).pack(side=tk.LEFT, padx=(0, 4))
+        self._button(actions, "⌘ 프롬프트 (⌘C)", self.copy_codex_prompt).pack(
             side=tk.LEFT, padx=(0, 4)
         )
-        self._button(actions, "TXT 저장", self.save_txt).pack(side=tk.LEFT)
+        self._button(actions, "▤ TXT (⌘T)", self.save_txt).pack(side=tk.LEFT)
         resize_box = tk.OptionMenu(actions, self.resize_size_var, *RESIZE_CHOICES)
         resize_box.configure(bg=BG, fg=TEXT, activebackground=PANEL, relief=tk.FLAT, width=7)
         resize_box["menu"].configure(bg=BG, fg=TEXT)
         resize_box.pack(side=tk.LEFT, padx=(8, 3))
-        self._button(actions, "리사이즈", self.resize_selected_images).pack(
+        self._button(actions, "↔ 리사이즈 (⌘Z)", self.resize_selected_images).pack(
             side=tk.LEFT, padx=(0, 8)
         )
         self.transparent_color_swatch = tk.Button(
             actions,
-            text="",
+            text="색 (⌘K)",
             command=self.choose_transparent_color,
             bg=self.transparent_color_var.get(),
             activebackground=self.transparent_color_var.get(),
+            fg=TEXT,
             relief=tk.FLAT,
-            width=2,
-            padx=0,
+            width=7,
+            padx=2,
             pady=3,
             highlightthickness=0,
         )
@@ -107,15 +108,28 @@ class LayoutMixin:
         )
         transparent_entry.pack(side=tk.LEFT, padx=(0, 3))
         transparent_entry.bind("<KeyRelease>", lambda _event: self.refresh_transparent_color_swatch())
-        self._button(actions, "투명화", self.apply_transparency_to_selected_images).pack(
+        tk.Label(actions, text="범위", bg=BG, fg=MUTED).pack(side=tk.LEFT, padx=(0, 2))
+        tolerance_box = tk.Spinbox(
+            actions,
+            from_=0,
+            to=255,
+            textvariable=self.transparent_tolerance_var,
+            width=4,
+            bg=PANEL,
+            fg=TEXT,
+            relief=tk.FLAT,
+            increment=4,
+        )
+        tolerance_box.pack(side=tk.LEFT, padx=(0, 3))
+        self._button(actions, "◫ 투명화 (⌘G)", self.apply_transparency_to_selected_images).pack(
             side=tk.LEFT, padx=(0, 8)
         )
-        self._button(actions, "팔레트 변환", self.apply_palette_to_shown_images).pack(
+        self._button(actions, "◩ 팔레트 (⌘P)", self.apply_palette_to_shown_images).pack(
             side=tk.LEFT, padx=(8, 0)
         )
         preview_toggle = tk.Checkbutton(
             actions,
-            text="팔레트 테스트 보기",
+            text="팔레트 테스트 (⌘V)",
             variable=self.palette_preview_var,
             command=self.toggle_palette_preview,
             bg=BG,
@@ -135,7 +149,7 @@ class LayoutMixin:
         self.bottom_bar.pack(side=tk.BOTTOM, fill=tk.X)
         self.bottom_toggle_button = self._button(
             self.bottom_bar,
-            "작업 패널 열기",
+            "▴ 작업 패널 (⌘W)",
             self.toggle_bottom_panel,
         )
         self.bottom_toggle_button.pack(side=tk.LEFT, padx=(0, 8))
@@ -173,7 +187,7 @@ class LayoutMixin:
             fg=TEXT,
             anchor="w",
         ).pack(side=tk.LEFT)
-        self._button(prompt_header, "프롬프트 초기화", self.reset_prompt).pack(side=tk.RIGHT)
+        self._button(prompt_header, "↺ 초기화 (⌘I)", self.reset_prompt).pack(side=tk.RIGHT)
 
         self.prompt_text = tk.Text(
             prompt_panel,
@@ -200,13 +214,13 @@ class LayoutMixin:
             fg=TEXT,
             anchor="w",
         ).pack(side=tk.LEFT)
-        self._button(template_header, "기본값 복원", self.restore_builtin_template).pack(
+        self._button(template_header, "↺ 기본값 (⌘B)", self.restore_builtin_template).pack(
             side=tk.RIGHT, padx=(6, 0)
         )
-        self._button(template_header, "다시 읽기", self.reload_template).pack(
+        self._button(template_header, "↻ 다시 읽기 (⌘L)", self.reload_template).pack(
             side=tk.RIGHT, padx=(6, 0)
         )
-        self._button(template_header, "템플릿 저장", self.save_template).pack(side=tk.RIGHT)
+        self._button(template_header, "◆ 저장 (⌘S)", self.save_template).pack(side=tk.RIGHT)
 
         template_path_row = tk.Frame(template_panel, bg=PANEL)
         template_path_row.pack(side=tk.TOP, fill=tk.X, pady=(0, 4))
@@ -219,10 +233,10 @@ class LayoutMixin:
             justify=tk.LEFT,
             wraplength=310,
         ).pack(side=tk.LEFT, fill=tk.X, expand=True)
-        self._button(template_path_row, "경로 복사", self.copy_template_path).pack(
+        self._button(template_path_row, "⇄ 경로 (⌘3)", self.copy_template_path).pack(
             side=tk.RIGHT, padx=(6, 0)
         )
-        self._button(template_path_row, "Finder에서 보기", self.reveal_template_file).pack(
+        self._button(template_path_row, "⌂ Finder", self.reveal_template_file).pack(
             side=tk.RIGHT
         )
 
@@ -252,10 +266,10 @@ class LayoutMixin:
             fg=TEXT,
             anchor="w",
         ).pack(side=tk.LEFT)
-        self._button(style_header, "원본 복사", self.copy_art_style_tokens).pack(
+        self._button(style_header, "⇄ 원본 (⌘4)", self.copy_art_style_tokens).pack(
             side=tk.RIGHT, padx=(6, 0)
         )
-        self._button(style_header, "다시 읽기", self.reload_art_style_tokens).pack(side=tk.RIGHT)
+        self._button(style_header, "↻ 다시 읽기", self.reload_art_style_tokens).pack(side=tk.RIGHT)
 
         style_path_row = tk.Frame(style_panel, bg=PANEL)
         style_path_row.pack(side=tk.TOP, fill=tk.X, pady=(0, 4))
@@ -269,10 +283,10 @@ class LayoutMixin:
             justify=tk.LEFT,
             wraplength=310,
         ).pack(side=tk.LEFT, fill=tk.X, expand=True)
-        self._button(style_path_row, "경로 복사", self.copy_art_style_path).pack(
+        self._button(style_path_row, "⇄ 경로 (⌘5)", self.copy_art_style_path).pack(
             side=tk.RIGHT, padx=(6, 0)
         )
-        self._button(style_path_row, "Finder에서 보기", self.reveal_art_style_file).pack(
+        self._button(style_path_row, "⌂ Finder", self.reveal_art_style_file).pack(
             side=tk.RIGHT
         )
 
@@ -317,6 +331,8 @@ class LayoutMixin:
         self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
         self.canvas.bind_all("<Button-4>", self._on_mousewheel)
         self.canvas.bind_all("<Button-5>", self._on_mousewheel)
+        self.bind_all("<ButtonRelease-1>", self.end_drag_selection, add="+")
+        self._bind_shortcuts()
 
     def _button(self, parent: tk.Widget, text: str, command) -> tk.Button:
         return tk.Button(
@@ -341,10 +357,53 @@ class LayoutMixin:
         self.bottom_panel_visible.set(visible)
         if visible:
             self.bottom_content.pack(side=tk.TOP, fill=tk.X, before=self.bottom_bar)
-            self.bottom_toggle_button.configure(text="작업 패널 닫기")
+            self.bottom_toggle_button.configure(text="▾ 작업 패널 (⌘W)")
         else:
             self.bottom_content.pack_forget()
-            self.bottom_toggle_button.configure(text="작업 패널 열기")
+            self.bottom_toggle_button.configure(text="▴ 작업 패널 (⌘W)")
+
+    def _bind_shortcuts(self) -> None:
+        self._shortcut("<Command-o>", self.choose_root)
+        self._shortcut("<Command-r>", self.rescan)
+        self._shortcut("<Command-f>", self.reveal_asset_root)
+        self._shortcut("<Command-a>", self.select_all)
+        self._shortcut("<Escape>", self.clear_selection)
+        self._shortcut("<Delete>", self.delete_selected_images)
+        self._shortcut("<BackSpace>", self.delete_selected_images)
+        self._shortcut("<Command-Key-1>", self.copy_relative_paths)
+        self._shortcut("<Command-Key-2>", self.copy_absolute_paths)
+        self._shortcut("<Command-c>", self.copy_codex_prompt)
+        self._shortcut("<Command-t>", self.save_txt)
+        self._shortcut("<Command-z>", self.resize_selected_images)
+        self._shortcut("<Command-g>", self.apply_transparency_to_selected_images)
+        self._shortcut("<Command-k>", self.choose_transparent_color)
+        self._shortcut("<Command-p>", self.apply_palette_to_shown_images)
+        self._shortcut("<Command-v>", self.toggle_palette_preview)
+        self._shortcut("<Command-w>", self.toggle_bottom_panel)
+        self._shortcut("<Command-i>", self.reset_prompt)
+        self._shortcut("<Command-b>", self.restore_builtin_template)
+        self._shortcut("<Command-l>", self.reload_template)
+        self._shortcut("<Command-s>", self.save_template)
+        self._shortcut("<Command-Key-3>", self.copy_template_path)
+        self._shortcut("<Command-Key-4>", self.copy_art_style_tokens)
+        self._shortcut("<Command-Key-5>", self.copy_art_style_path)
+
+    def _shortcut(self, sequence: str, command) -> None:
+        self.bind_all(sequence, lambda event, action=command: self._run_shortcut(event, action))
+
+    def _run_shortcut(self, event: tk.Event, command) -> str:
+        if self._shortcut_should_use_text_default(event):
+            return ""
+        command()
+        return "break"
+
+    def _shortcut_should_use_text_default(self, event: tk.Event) -> bool:
+        widget = event.widget
+        if isinstance(widget, tk.Text):
+            return True
+        if isinstance(widget, tk.Entry) and event.keysym not in {"Escape"}:
+            return True
+        return False
 
     def _update_scroll_region(self, _event: tk.Event) -> None:
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
@@ -364,4 +423,14 @@ class LayoutMixin:
 
         if units:
             self.canvas.yview_scroll(units, "units")
+            if self.drag_selecting or getattr(event, "state", 0) & 0x0001:
+                self.after_idle(self.select_asset_under_pointer)
         return "break"
+
+    def autoscroll_during_drag(self, event: tk.Event) -> None:
+        canvas_top = self.canvas.winfo_rooty()
+        canvas_bottom = canvas_top + self.canvas.winfo_height()
+        if event.y_root < canvas_top + 28:
+            self.canvas.yview_scroll(-2, "units")
+        elif event.y_root > canvas_bottom - 28:
+            self.canvas.yview_scroll(2, "units")
