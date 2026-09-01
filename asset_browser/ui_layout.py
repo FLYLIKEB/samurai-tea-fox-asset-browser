@@ -64,28 +64,62 @@ class LayoutMixin:
         toolbar.columnconfigure(0, weight=3)
         toolbar.columnconfigure(4, weight=2)
 
-        actions = tk.Frame(self, bg=BG, padx=8, pady=5)
+        actions = tk.Frame(self, bg=BG, padx=8, pady=6)
         actions.pack(side=tk.TOP, fill=tk.X)
 
-        self._button(actions, "✓ 전체 (⌘A)", self.select_all).pack(side=tk.LEFT, padx=(0, 4))
-        self._button(actions, "× 해제 (Esc)", self.clear_selection).pack(side=tk.LEFT, padx=(0, 4))
-        self._button(actions, "⌫ 삭제 (Del)", self.delete_selected_images).pack(side=tk.LEFT, padx=(0, 4))
-        self._button(actions, "⇢ 이동 (⌘M)", self.move_selected_images).pack(side=tk.LEFT, padx=(0, 8))
-        self._button(actions, "⇄ 상대 (⌘1)", self.copy_relative_paths).pack(side=tk.LEFT, padx=(0, 4))
-        self._button(actions, "⛓ 절대 (⌘2)", self.copy_absolute_paths).pack(side=tk.LEFT, padx=(0, 4))
-        self._button(actions, "⌘ 프롬프트 (⌘C)", self.copy_codex_prompt).pack(
+        action_row = tk.Frame(actions, bg=BG)
+        action_row.pack(side=tk.TOP, fill=tk.X)
+        image_row = tk.Frame(actions, bg=BG)
+        image_row.pack(side=tk.TOP, fill=tk.X, pady=(4, 0))
+
+        self._button(action_row, "✓ 전체 (⌘A)", self.select_all, width=11).pack(
             side=tk.LEFT, padx=(0, 4)
         )
-        self._button(actions, "▤ TXT (⌘T)", self.save_txt).pack(side=tk.LEFT)
-        resize_box = tk.OptionMenu(actions, self.resize_size_var, *RESIZE_CHOICES)
+        self._button(action_row, "× 해제 (Esc)", self.clear_selection, width=11).pack(
+            side=tk.LEFT, padx=(0, 4)
+        )
+        scroll_select_toggle = tk.Checkbutton(
+            action_row,
+            text="↕ 스크롤선택 (⌘E)",
+            variable=self.scroll_select_var,
+            command=self.scroll_select_changed,
+            bg=BG,
+            fg=TEXT,
+            activebackground=BG,
+            activeforeground=TEXT,
+            selectcolor=PANEL,
+            relief=tk.FLAT,
+            padx=6,
+            width=15,
+            anchor="w",
+        )
+        scroll_select_toggle.pack(side=tk.LEFT, padx=(0, 10))
+        self._button(action_row, "⌫ 삭제 (Del)", self.delete_selected_images, width=11).pack(
+            side=tk.LEFT, padx=(0, 4)
+        )
+        self._button(action_row, "⇢ 이동 (⌘M)", self.move_selected_images, width=11).pack(
+            side=tk.LEFT, padx=(0, 12)
+        )
+        self._button(action_row, "⇄ 상대 (⌘1)", self.copy_relative_paths, width=11).pack(
+            side=tk.LEFT, padx=(0, 4)
+        )
+        self._button(action_row, "⛓ 절대 (⌘2)", self.copy_absolute_paths, width=11).pack(
+            side=tk.LEFT, padx=(0, 4)
+        )
+        self._button(action_row, "⌘ 프롬프트 (⌘C)", self.copy_codex_prompt, width=15).pack(
+            side=tk.LEFT, padx=(0, 4)
+        )
+        self._button(action_row, "▤ TXT (⌘T)", self.save_txt, width=10).pack(side=tk.LEFT)
+
+        resize_box = tk.OptionMenu(image_row, self.resize_size_var, *RESIZE_CHOICES)
         resize_box.configure(bg=BG, fg=TEXT, activebackground=PANEL, relief=tk.FLAT, width=7)
         resize_box["menu"].configure(bg=BG, fg=TEXT)
-        resize_box.pack(side=tk.LEFT, padx=(8, 3))
-        self._button(actions, "↔ 리사이즈 (⌘Z)", self.resize_selected_images).pack(
-            side=tk.LEFT, padx=(0, 8)
+        resize_box.pack(side=tk.LEFT, padx=(0, 4))
+        self._button(image_row, "↔ 리사이즈 (⌘Z)", self.resize_selected_images, width=14).pack(
+            side=tk.LEFT, padx=(0, 12)
         )
         self.transparent_color_swatch = tk.Button(
-            actions,
+            image_row,
             text="색 (⌘K)",
             command=self.choose_transparent_color,
             bg=self.transparent_color_var.get(),
@@ -99,7 +133,7 @@ class LayoutMixin:
         )
         self.transparent_color_swatch.pack(side=tk.LEFT, padx=(0, 3))
         transparent_entry = tk.Entry(
-            actions,
+            image_row,
             textvariable=self.transparent_color_var,
             bg=PANEL,
             fg=TEXT,
@@ -109,9 +143,9 @@ class LayoutMixin:
         )
         transparent_entry.pack(side=tk.LEFT, padx=(0, 3))
         transparent_entry.bind("<KeyRelease>", lambda _event: self.refresh_transparent_color_swatch())
-        tk.Label(actions, text="범위", bg=BG, fg=MUTED).pack(side=tk.LEFT, padx=(0, 2))
+        tk.Label(image_row, text="범위", bg=BG, fg=MUTED).pack(side=tk.LEFT, padx=(0, 2))
         tolerance_box = tk.Spinbox(
-            actions,
+            image_row,
             from_=0,
             to=255,
             textvariable=self.transparent_tolerance_var,
@@ -122,14 +156,17 @@ class LayoutMixin:
             increment=4,
         )
         tolerance_box.pack(side=tk.LEFT, padx=(0, 3))
-        self._button(actions, "◫ 투명화 (⌘G)", self.apply_transparency_to_selected_images).pack(
+        self._button(
+            image_row,
+            "◫ 투명화 (⌘G)",
+            self.apply_transparency_to_selected_images,
+            width=13,
+        ).pack(side=tk.LEFT, padx=(0, 12))
+        self._button(image_row, "◩ 팔레트 (⌘P)", self.apply_palette_to_shown_images, width=13).pack(
             side=tk.LEFT, padx=(0, 8)
         )
-        self._button(actions, "◩ 팔레트 (⌘P)", self.apply_palette_to_shown_images).pack(
-            side=tk.LEFT, padx=(8, 0)
-        )
         preview_toggle = tk.Checkbutton(
-            actions,
+            image_row,
             text="팔레트 테스트 (⌘V)",
             variable=self.palette_preview_var,
             command=self.toggle_palette_preview,
@@ -140,22 +177,10 @@ class LayoutMixin:
             selectcolor=PANEL,
             relief=tk.FLAT,
             padx=6,
+            width=15,
+            anchor="w",
         )
-        preview_toggle.pack(side=tk.RIGHT)
-        scroll_select_toggle = tk.Checkbutton(
-            actions,
-            text="↕ 스크롤선택 (⌘E)",
-            variable=self.scroll_select_var,
-            command=self.scroll_select_changed,
-            bg=BG,
-            fg=TEXT,
-            activebackground=BG,
-            activeforeground=TEXT,
-            selectcolor=PANEL,
-            relief=tk.FLAT,
-            padx=6,
-        )
-        scroll_select_toggle.pack(side=tk.RIGHT, padx=(0, 8))
+        preview_toggle.pack(side=tk.LEFT)
 
         self.bottom_panel = tk.Frame(self, bg=PANEL, padx=8, pady=3)
         self.bottom_panel.pack(side=tk.BOTTOM, fill=tk.X)
@@ -349,7 +374,8 @@ class LayoutMixin:
         self.bind_all("<ButtonRelease-1>", self.end_drag_selection, add="+")
         self._bind_shortcuts()
 
-    def _button(self, parent: tk.Widget, text: str, command) -> tk.Button:
+    def _button(self, parent: tk.Widget, text: str, command, width: int | None = None) -> tk.Button:
+        options = {"width": width} if width is not None else {}
         return tk.Button(
             parent,
             text=text,
@@ -363,6 +389,7 @@ class LayoutMixin:
             pady=3,
             highlightthickness=0,
             highlightbackground=BORDER,
+            **options,
         )
 
     def toggle_bottom_panel(self) -> None:
