@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "samurai-tea-fox-asset-browser"
+version = "0.1.0"
+description = "Minimal Tkinter asset browser for 32x32 pixel-art game assets."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "Pillow>=10",
+]
+
+[project.scripts]
+asset-browser = "asset_browser.cli:main"
+
+[tool.setuptools.package-data]
+asset_browser = ["default_prompt_template.txt"]
