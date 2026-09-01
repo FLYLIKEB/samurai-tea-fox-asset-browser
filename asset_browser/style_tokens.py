@@ -7,6 +7,8 @@ from pathlib import Path
 
 from .constants import ART_STYLE_TOKENS_PATH
 
+CANONICAL_PALETTE_LABEL = "정본"
+
 def load_art_style_tokens(project_root: Path) -> tuple[dict | None, str]:
     path = project_root / ART_STYLE_TOKENS_PATH
     if not path.exists():
@@ -40,13 +42,139 @@ def hex_to_rgb(color: str) -> tuple[int, int, int] | None:
     except ValueError:
         return None
 
-def extract_palette_colors(data: dict | None) -> list[tuple[int, int, int]]:
+def palette_candidates(data: dict | None) -> list[dict]:
+    if data is None:
+        return []
+    candidates = data.get("palette", {}).get("candidates", [])
+    return candidates if isinstance(candidates, list) else []
+
+def palette_candidate_label(candidate: dict) -> str:
+    name = candidate.get("name", candidate.get("id", "후보"))
+    candidate_id = candidate.get("id", "")
+    return f"{name} ({candidate_id})" if candidate_id else name
+
+def palette_candidate_options(data: dict | None) -> list[tuple[str, str]]:
+    options = [(CANONICAL_PALETTE_LABEL, "")]
+    for candidate in palette_candidates(data):
+        candidate_id = candidate.get("id", "")
+        if candidate_id:
+            options.append((palette_candidate_label(candidate), candidate_id))
+    return options
+
+def palette_block(data: dict | None, candidate_id: str = "") -> dict:
+    if data is None:
+        return {}
+
+    palette = data.get("palette", {})
+    if not candidate_id:
+        return palette
+
+    candidate = next(
+        (item for item in palette_candidates(data) if item.get("id") == candidate_id),
+        None,
+    )
+    if candidate is None:
+        return palette
+
+    merged = dict(palette)
+    merged["global"] = merge_global_palette(palette.get("global", []), candidate.get("global", []))
+    merged["biome_accents"] = merge_biome_accents(
+        palette.get("biome_accents", []),
+        candidate.get("biome_accents", []),
+    )
+    return merged
+
+def merge_global_palette(base: list[dict], candidate: list[dict]) -> list[dict]:
+    candidate_by_id = {entry.get("id"): entry for entry in candidate}
+    merged: list[dict] = []
+    for base_entry in base:
+        entry = dict(base_entry)
+        override = candidate_by_id.get(base_entry.get("id"))
+        if override:
+            entry.update(override)
+        merged.append(entry)
+    base_ids = {entry.get("id") for entry in base}
+    merged.extend(dict(entry) for entry in candidate if entry.get("id") not in base_ids)
+    return merged
+
+def merge_biome_accents(base: list[dict], candidate: list[dict]) -> list[dict]:
+    candidate_by_id = {entry.get("id"): entry for entry in candidate}
+    merged: list[dict] = []
+    for base_entry in base:
+        entry = dict(base_entry)
+        override = candidate_by_id.get(base_entry.get("id"))
+        if override:
+            entry.update(override)
+        merged.append(entry)
+    base_ids = {entry.get("id") for entry in base}
+    merged.extend(dict(entry) for entry in candidate if entry.get("id") not in base_ids)
+    return merged
+
+def apply_palette_candidate(data: dict, candidate_id: str) -> bool:
+    palette = data.get("palette", {})
+    candidate = next(
+        (item for item in palette_candidates(data) if item.get("id") == candidate_id),
+        None,
+    )
+    if candidate is None:
+        return False
+
+    block = palette_block(data, candidate_id)
+    palette["global"] = block.get("global", [])
+    palette["biome_accents"] = block.get("biome_accents", [])
+    return True
+
+def upsert_candidate_global_color(
+    data: dict,
+    candidate_id: str,
+    color_id: str,
+    hex_color: str,
+) -> bool:
+    candidate = next(
+        (item for item in palette_candidates(data) if item.get("id") == candidate_id),
+        None,
+    )
+    if candidate is None:
+        return False
+    global_palette = candidate.setdefault("global", [])
+    entry = next((item for item in global_palette if item.get("id") == color_id), None)
+    if entry is None:
+        global_palette.append({"id": color_id, "hex": hex_color})
+    else:
+        entry["hex"] = hex_color
+    return True
+
+def upsert_candidate_biome_color(
+    data: dict,
+    candidate_id: str,
+    biome_id: str,
+    color_index: int,
+    hex_color: str,
+) -> bool:
+    candidate = next(
+        (item for item in palette_candidates(data) if item.get("id") == candidate_id),
+        None,
+    )
+    if candidate is None:
+        return False
+    biome_accents = candidate.setdefault("biome_accents", [])
+    entry = next((item for item in biome_accents if item.get("id") == biome_id), None)
+    if entry is None:
+        entry = {"id": biome_id, "colors": []}
+        biome_accents.append(entry)
+    colors = entry.setdefault("colors", [])
+    while len(colors) <= color_index:
+        colors.append("#000000")
+    colors[color_index] = hex_color
+    return True
+
+def extract_palette_colors(data: dict | None, candidate_id: str = "") -> list[tuple[int, int, int]]:
     if data is None:
         return []
 
     colors: list[tuple[int, int, int]] = []
     seen: set[tuple[int, int, int]] = set()
-    palette = data.get("palette", {})
+    palette = palette_block(data, candidate_id)
 
     for entry in palette.get("global", []):
         rgb = hex_to_rgb(entry.get("hex", ""))
@@ -123,6 +251,16 @@ def format_art_style_tokens(data: dict | None, error: str) -> str:
         for accent in biome_accents:
             colors = ", ".join(accent.get("colors", []))
             lines.append(f"- {accent.get('name', accent.get('id', '(바이옴)'))}: {colors} / {accent.get('usage', '')}")
+        lines.append("")
+
+    candidates = palette_candidates(data)
+    if candidates:
+        lines.append("[팔레트 후보]")
+        for candidate in candidates:
+            lines.append(
+                f"- {candidate.get('name', candidate.get('id', '(후보)'))}: "
+                f"{candidate.get('description', '')}"
+            )
         lines.append("")
 
     palette_rules = palette.get("rules", {})

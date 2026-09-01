@@ -68,12 +68,19 @@ from asset_browser.prompting import (
 )
 from asset_browser.scanner import find_images, folder_group_label, group_images_by_folder
 from asset_browser.style_tokens import (
+    CANONICAL_PALETTE_LABEL,
+    apply_palette_candidate,
     extract_palette_colors,
     format_art_style_tokens,
     hex_to_rgb,
     load_art_style_tokens,
     normalize_hex_color,
+    palette_block,
+    palette_candidate_options,
+    palette_candidates,
     save_art_style_tokens,
+    upsert_candidate_biome_color,
+    upsert_candidate_global_color,
 )
 from asset_browser.ui_app import AssetBrowser
 from asset_browser.ui_layout import wheel_scroll_units
@@ -85,6 +92,7 @@ __all__ = [
     "BG",
     "BORDER",
     "BUILTIN_PROMPT_TEMPLATE",
+    "CANONICAL_PALETTE_LABEL",
     "ERROR",
     "IMAGE_EXTENSIONS",
     "Image",
@@ -98,6 +106,7 @@ __all__ = [
     "SELECTED_TEXT",
     "TEXT",
     "apply_palette_to_images",
+    "apply_palette_candidate",
     "apply_transparency_to_images",
     "codex_prompt_for",
     "color_within_tolerance",
@@ -124,6 +133,9 @@ __all__ = [
     "normalize_hex_color",
     "paint_backup_root",
     "palette_backup_root",
+    "palette_block",
+    "palette_candidate_options",
+    "palette_candidates",
     "parse_image_size",
     "parse_args",
     "project_root_from_script",
@@ -138,6 +150,8 @@ __all__ = [
     "save_rgba_image_to_file",
     "template_path",
     "unique_destination_path",
+    "upsert_candidate_biome_color",
+    "upsert_candidate_global_color",
     "wheel_scroll_units",
 ]
 

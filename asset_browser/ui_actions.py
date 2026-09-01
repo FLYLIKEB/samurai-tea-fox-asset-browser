@@ -566,7 +566,7 @@ class ActionsMixin:
             messagebox.showinfo("이미지 없음", "변환할 표시 이미지가 없습니다.")
             return
 
-        palette = extract_palette_colors(self.art_style_data)
+        palette = extract_palette_colors(self.art_style_data, self.selected_palette_candidate_id())
         if not palette:
             messagebox.showinfo("팔레트 없음", "적용할 팔레트 색상을 찾지 못했습니다.")
             return

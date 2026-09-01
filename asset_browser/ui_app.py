@@ -36,6 +36,7 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         self.transparent_color_var = tk.StringVar(value="#ffffff")
         self.transparent_tolerance_var = tk.IntVar(value=32)
         self.palette_preview_var = tk.BooleanVar(value=False)
+        self.palette_candidate_var = tk.StringVar(value="정본")
         self.scroll_select_var = tk.BooleanVar(value=False)
         self.bottom_panel_visible = tk.BooleanVar(value=False)
         self.filter_var = tk.StringVar()
@@ -52,6 +53,7 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         self.prompt_template = load_prompt_template(project_root)
         self.art_style_data: dict | None = None
         self.art_style_raw = ""
+        self.palette_candidate_ids: dict[str, str] = {"정본": ""}
         self.prompt_dirty = False
         self.template_dirty = False
         self.updating_prompt = False
@@ -301,7 +303,10 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
                     width, height = image.size
                     meta_suffix = ""
                     if self.palette_preview_var.get():
-                        palette = extract_palette_colors(self.art_style_data)
+                        palette = extract_palette_colors(
+                            self.art_style_data,
+                            self.selected_palette_candidate_id(),
+                        )
                         if palette:
                             image = recolor_image_to_palette(image, palette)
                             meta_suffix = " | 팔레트 테스트"

@@ -165,6 +165,55 @@ class AssetBrowserCoreTest(unittest.TestCase):
             [(0, 0, 0), (255, 255, 255), (17, 34, 51)],
         )
 
+    def test_palette_candidate_colors_overlay_canonical_palette(self) -> None:
+        data = {
+            "palette": {
+                "global": [
+                    {"id": "ink", "name": "먹선", "hex": "#111111"},
+                    {"id": "paper", "name": "한지", "hex": "#EEEEEE"},
+                ],
+                "biome_accents": [{"id": "white", "name": "백국", "colors": ["#AAAAAA"]}],
+                "candidates": [
+                    {
+                        "id": "brighter",
+                        "name": "밝음",
+                        "global": [{"id": "paper", "hex": "#FFFFFF"}],
+                        "biome_accents": [{"id": "white", "colors": ["#CCCCCC"]}],
+                    }
+                ],
+            }
+        }
+
+        block = core.palette_block(data, "brighter")
+
+        self.assertEqual(block["global"][0]["hex"], "#111111")
+        self.assertEqual(block["global"][1]["name"], "한지")
+        self.assertEqual(block["global"][1]["hex"], "#FFFFFF")
+        self.assertEqual(block["biome_accents"][0]["colors"], ["#CCCCCC"])
+        self.assertEqual(
+            core.extract_palette_colors(data, "brighter"),
+            [(17, 17, 17), (255, 255, 255), (204, 204, 204)],
+        )
+
+    def test_apply_palette_candidate_promotes_candidate_to_canonical_palette(self) -> None:
+        data = {
+            "palette": {
+                "global": [{"id": "ink", "hex": "#111111"}],
+                "biome_accents": [{"id": "white", "colors": ["#AAAAAA"]}],
+                "candidates": [
+                    {
+                        "id": "brighter",
+                        "global": [{"id": "ink", "hex": "#222222"}],
+                        "biome_accents": [{"id": "white", "colors": ["#BBBBBB"]}],
+                    }
+                ],
+            }
+        }
+
+        self.assertTrue(core.apply_palette_candidate(data, "brighter"))
+        self.assertEqual(data["palette"]["global"][0]["hex"], "#222222")
+        self.assertEqual(data["palette"]["biome_accents"][0]["colors"], ["#BBBBBB"])
+
     @unittest.skipIf(core.Image is None, "Pillow is not installed")
     def test_recolor_image_to_palette_preserves_transparent_pixels(self) -> None:
         image = core.Image.new("RGBA", (2, 1))

@@ -54,7 +54,11 @@ class ImageCropWindow(tk.Toplevel):
         self.edit_dirty = False
         self.last_changed_pixels = 0
         self.project_root = getattr(parent, "project_root", asset.path.parent)
-        self.palette_colors = extract_palette_colors(getattr(parent, "art_style_data", None))
+        selected_candidate = getattr(parent, "selected_palette_candidate_id", lambda: "")()
+        self.palette_colors = extract_palette_colors(
+            getattr(parent, "art_style_data", None),
+            selected_candidate,
+        )
 
         self.title(f"이미지 상세 - {asset.relative_path.name}")
         self.geometry("1080x760")
