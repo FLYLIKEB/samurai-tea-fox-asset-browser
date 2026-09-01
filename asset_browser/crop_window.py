@@ -12,11 +12,11 @@ from .image_ops import (
     Image,
     ImageTk,
     crop_boxes_to_files,
-    crop_image_to_file,
     default_crop_output_path,
     flood_fill_image,
     make_edge_connected_color_transparent,
     normalize_crop_box,
+    save_cropped_image_to_file,
     save_rgba_image_to_file,
 )
 from .models import AssetImage
@@ -255,6 +255,9 @@ class ImageCropWindow(tk.Toplevel):
         self._set_box((*self.start, *self.start))
 
     def _drag_crop(self, event: tk.Event) -> None:
+        if self.tool_mode.get() == "paint":
+            self.paint_at_event(event)
+            return
         if self.tool_mode.get() != "crop":
             return
         if self.start is None:
@@ -465,7 +468,7 @@ class ImageCropWindow(tk.Toplevel):
         target = default_crop_output_path(self.asset.path, self.box)
 
         try:
-            crop_image_to_file(self.asset.path, target, self.box)
+            save_cropped_image_to_file(self.original, target, self.box)
         except Exception as exc:
             messagebox.showerror("크롭 저장 실패", str(exc))
             return "break"
@@ -484,7 +487,7 @@ class ImageCropWindow(tk.Toplevel):
             return "break"
 
         try:
-            saved_paths = crop_boxes_to_files(self.asset.path, boxes)
+            saved_paths = crop_boxes_to_files(self.asset.path, boxes, self.original)
         except Exception as exc:
             messagebox.showerror("크롭 저장 실패", str(exc))
             return "break"

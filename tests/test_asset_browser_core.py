@@ -316,6 +316,30 @@ class AssetBrowserCoreTest(unittest.TestCase):
                 self.assertEqual(cropped.convert("RGBA").getpixel((0, 0)), (255, 0, 0, 255))
 
     @unittest.skipIf(core.Image is None, "Pillow is not installed")
+    def test_save_cropped_image_to_file_uses_edited_image_pixels(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "crop.png"
+            image = core.Image.new("RGBA", (4, 4), (0, 0, 0, 0))
+            image.putpixel((1, 1), (12, 34, 56, 255))
+
+            core.save_cropped_image_to_file(image, target, (1, 1, 2, 2))
+
+            with core.Image.open(target) as cropped:
+                self.assertEqual(cropped.convert("RGBA").getpixel((0, 0)), (12, 34, 56, 255))
+
+    @unittest.skipIf(core.Image is None, "Pillow is not installed")
+    def test_save_rgba_image_to_file_overwrites_source(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "source.png"
+            core.Image.new("RGBA", (1, 1), (0, 0, 0, 255)).save(source)
+            edited = core.Image.new("RGBA", (1, 1), (10, 20, 30, 255))
+
+            core.save_rgba_image_to_file(edited, source)
+
+            with core.Image.open(source) as saved:
+                self.assertEqual(saved.convert("RGBA").getpixel((0, 0)), (10, 20, 30, 255))
+
+    @unittest.skipIf(core.Image is None, "Pillow is not installed")
     def test_crop_boxes_to_files_saves_multiple_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             source = Path(tmp) / "source.png"
@@ -331,6 +355,19 @@ class AssetBrowserCoreTest(unittest.TestCase):
                 "source_crop_1_0_1x1.png",
             ])
             self.assertTrue(all(path.exists() for path in saved))
+
+    @unittest.skipIf(core.Image is None, "Pillow is not installed")
+    def test_crop_boxes_to_files_can_use_edited_image_pixels(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "source.png"
+            core.Image.new("RGBA", (2, 1), (0, 0, 0, 255)).save(source)
+            edited = core.Image.new("RGBA", (2, 1), (0, 0, 0, 255))
+            edited.putpixel((1, 0), (200, 100, 50, 255))
+
+            saved = core.crop_boxes_to_files(source, [(1, 0, 2, 1)], edited)
+
+            with core.Image.open(saved[0]) as cropped:
+                self.assertEqual(cropped.convert("RGBA").getpixel((0, 0)), (200, 100, 50, 255))
 
     @unittest.skipIf(core.Image is None, "Pillow is not installed")
     def test_resize_image_to_file_uses_nearest_size(self) -> None:

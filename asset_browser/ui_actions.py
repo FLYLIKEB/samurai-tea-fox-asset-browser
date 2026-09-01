@@ -296,7 +296,7 @@ class ActionsMixin:
 
     def _crop_saved(self, path: Path) -> None:
         self.rescan()
-        self.status_var.set(f"크롭 저장 완료: {path}")
+        self.status_var.set(f"이미지 저장 완료: {path}")
 
     def reset_prompt(self) -> None:
         self.update_prompt_preview(force=True)

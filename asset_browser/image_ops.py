@@ -99,18 +99,33 @@ def crop_image_to_file(source: Path, target: Path, box: tuple[int, int, int, int
     if Image is None:
         raise RuntimeError("이미지 크롭에는 Pillow가 필요합니다.")
 
-    target.parent.mkdir(parents=True, exist_ok=True)
     with Image.open(source) as opened:
-        cropped = opened.convert("RGBA").crop(box)
-        if target.suffix.lower() in {".jpg", ".jpeg"}:
-            cropped = cropped.convert("RGB")
-        cropped.save(target)
+        save_cropped_image_to_file(opened, target, box)
 
-def crop_boxes_to_files(source: Path, boxes: list[tuple[int, int, int, int]]) -> list[Path]:
+
+def save_cropped_image_to_file(image, target: Path, box: tuple[int, int, int, int]) -> None:
+    if Image is None:
+        raise RuntimeError("이미지 크롭에는 Pillow가 필요합니다.")
+
+    target.parent.mkdir(parents=True, exist_ok=True)
+    cropped = image.convert("RGBA").crop(box)
+    if target.suffix.lower() in {".jpg", ".jpeg"}:
+        cropped = cropped.convert("RGB")
+    cropped.save(target)
+
+
+def crop_boxes_to_files(
+    source: Path,
+    boxes: list[tuple[int, int, int, int]],
+    image=None,
+) -> list[Path]:
     saved_paths: list[Path] = []
     for box in boxes:
         target = default_crop_output_path(source, box)
-        crop_image_to_file(source, target, box)
+        if image is None:
+            crop_image_to_file(source, target, box)
+        else:
+            save_cropped_image_to_file(image, target, box)
         saved_paths.append(target)
     return saved_paths
 
