@@ -7,6 +7,11 @@ from pathlib import Path
 from asset_browser import asset_browser as core
 
 class AssetBrowserCoreTest(unittest.TestCase):
+    def test_parse_args_defaults_to_2x_scale(self) -> None:
+        args = core.parse_args([])
+
+        self.assertEqual(args.scale, 2)
+
     def test_find_images_returns_sorted_project_relative_paths(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project_root = Path(tmp)
@@ -57,12 +62,12 @@ class AssetBrowserCoreTest(unittest.TestCase):
 
         self.assertEqual(browser.current_group_labels(), ["32x32 / tiles", "32x64 / sprites"])
 
-    def test_thumbnail_scale_keeps_32px_assets_at_4x_inside_128px_box(self) -> None:
+    def test_thumbnail_scale_keeps_32px_assets_at_default_2x(self) -> None:
         scaled_size = core.AssetBrowser._scaled_size
 
-        self.assertEqual(scaled_size(None, 32, 32, 4), (128, 128))
-        self.assertEqual(scaled_size(None, 32, 64, 4), (128, 256))
-        self.assertEqual(scaled_size(None, 64, 64, 4), core.SUMMARY_PREVIEW_SIZE)
+        self.assertEqual(scaled_size(None, 32, 32, core.PREVIEW_SCALE), (64, 64))
+        self.assertEqual(scaled_size(None, 32, 64, core.PREVIEW_SCALE), (64, 128))
+        self.assertEqual(scaled_size(None, 64, 64, core.PREVIEW_SCALE), core.SUMMARY_PREVIEW_SIZE)
 
     def test_tile_size_group_labels_large_images_as_summary(self) -> None:
         self.assertEqual(core.tile_size_group_label((32, 32)), "32x32")

@@ -25,7 +25,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--scale",
         type=int,
-        default=4,
+        default=2,
         choices=SCALE_CHOICES,
         help="작은 픽셀아트 이미지를 보여줄 정수 미리보기 배율입니다.",
     )
