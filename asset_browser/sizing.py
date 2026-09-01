@@ -6,7 +6,7 @@ BASE_TILE_SIZE = 32
 PREVIEW_SCALE = 2
 SUMMARY_THRESHOLD = 64
 STRIP_SUMMARY_THRESHOLD = 128
-SUMMARY_PREVIEW_SIZE = (104, 64)
+SUMMARY_PREVIEW_SIZE = (104, 104)
 
 
 def is_summary_size(width: int, height: int) -> bool:
@@ -47,13 +47,20 @@ def tile_size_sort_key(size: tuple[int, int] | None) -> tuple[int, int, int]:
     return 10, height, width
 
 
+def fit_size_within(size: tuple[int, int], max_size: tuple[int, int]) -> tuple[int, int]:
+    width, height = size
+    max_width, max_height = max_size
+    scale = min(max_width / max(width, 1), max_height / max(height, 1))
+    return max(1, int(width * scale)), max(1, int(height * scale))
+
+
 def preview_size_for_image(size: tuple[int, int] | None, scale: int) -> tuple[int, int]:
     if size is None:
         return SUMMARY_PREVIEW_SIZE
 
     width, height = size
     if is_summary_size(width, height):
-        return SUMMARY_PREVIEW_SIZE
+        return fit_size_within(size, SUMMARY_PREVIEW_SIZE)
 
     scale = max(1, scale)
     return max(1, width * scale), max(1, height * scale)

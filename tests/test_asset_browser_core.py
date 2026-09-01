@@ -110,7 +110,13 @@ class AssetBrowserCoreTest(unittest.TestCase):
 
         self.assertEqual(scaled_size(None, 32, 32, core.PREVIEW_SCALE), (64, 64))
         self.assertEqual(scaled_size(None, 32, 64, core.PREVIEW_SCALE), (64, 128))
-        self.assertEqual(scaled_size(None, 64, 64, core.PREVIEW_SCALE), core.SUMMARY_PREVIEW_SIZE)
+        self.assertEqual(scaled_size(None, 64, 64, core.PREVIEW_SCALE), (104, 104))
+        self.assertEqual(scaled_size(None, 32, 128, core.PREVIEW_SCALE), (26, 104))
+
+    def test_fit_size_within_preserves_aspect_ratio(self) -> None:
+        self.assertEqual(core.fit_size_within((64, 64), (104, 104)), (104, 104))
+        self.assertEqual(core.fit_size_within((256, 128), (104, 104)), (104, 52))
+        self.assertEqual(core.fit_size_within((32, 128), (104, 104)), (26, 104))
 
     @unittest.skipIf(core.Image is None, "Pillow is not installed")
     def test_image_info_reports_transparency(self) -> None:

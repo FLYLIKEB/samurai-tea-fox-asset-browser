@@ -14,7 +14,7 @@
 ## Product goals
 - Goals: Show many assets at once, batch-select quickly, edit/crop sprites without leaving the app.
 - Non-goals: Full replacement for Aseprite or a general image editor.
-- Success signals: Users can distinguish folder/size/transparent state at a glance and reach the next action without scanning every button.
+- Success signals: Users can distinguish folder/size/transparent state at a glance, including 64x64+ thumbnails, and reach the next action without scanning every button.
 
 ## Personas and jobs
 - Primary personas: Solo developer/artist using Codex-assisted asset iteration.
@@ -37,7 +37,7 @@
 - Spacing/layout rhythm: Small fixed groups, stable cell sizes, no layout shift on selection.
 - Shape/radius/elevation: Flat Tk controls, thin borders only where they clarify sections.
 - Motion: None.
-- Imagery/iconography: Text plus simple symbols for commands; pixel previews use nearest scaling.
+- Imagery/iconography: Text plus simple symbols for commands; pixel previews use nearest scaling and large assets keep aspect ratio in thumbnail bounds.
 
 ## Components
 - Existing components to reuse: `_button`, fixed grid cells, grouped headers, bottom panel tabs.

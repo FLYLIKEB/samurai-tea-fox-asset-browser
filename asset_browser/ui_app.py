@@ -15,7 +15,6 @@ from .prompting import load_prompt_template
 from .scanner import folder_group_label
 from .sizing import (
     cell_size_for_preview,
-    is_summary_size,
     preview_size_for_image,
     tile_size_group_label,
     tile_size_sort_key,
@@ -273,15 +272,6 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         if thumb is not None:
             self.thumbnail_refs.append(thumb)
             image_label = tk.Label(image_box, image=thumb, bg=bg)
-        elif source_size is not None and is_summary_size(*source_size):
-            image_label = tk.Label(
-                image_box,
-                text="요약\n대형/시트",
-                bg=bg,
-                fg=meta_fg,
-                justify=tk.CENTER,
-                font=("TkDefaultFont", 9),
-            )
         else:
             preview_error = True
             image_label = tk.Label(
@@ -424,17 +414,14 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         known_size = self.image_size_by_path.get(path)
         has_transparency = getattr(self, "image_has_transparency_by_path", {}).get(path)
         transparency_meta = self._transparency_label(has_transparency)
-        if known_size is not None and is_summary_size(*known_size):
-            width, height = known_size
-            tiles_wide = max(1, math.ceil(width / 32))
-            tiles_high = max(1, math.ceil(height / 32))
-            return None, f"{width}x{height} | {tiles_wide}x{tiles_high}타일 | {transparency_meta}"
 
         if Image is not None and ImageTk is not None:
             try:
                 with Image.open(path) as opened:
                     image = opened.convert("RGBA")
                     width, height = image.size
+                    tiles_wide = max(1, math.ceil(width / 32))
+                    tiles_high = max(1, math.ceil(height / 32))
                     meta_suffix = ""
                     if self.palette_preview_var.get():
                         palette = extract_palette_colors(
@@ -451,7 +438,10 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
                     image = image.resize((target_width, target_height), resampling.NEAREST)
                     if has_transparency is True:
                         image = composite_on_checkerboard(image)
-                    return ImageTk.PhotoImage(image), f"{width}x{height} | {transparency_meta}{meta_suffix}"
+                    return (
+                        ImageTk.PhotoImage(image),
+                        f"{width}x{height} | {tiles_wide}x{tiles_high}타일 | {transparency_meta}{meta_suffix}",
+                    )
             except Exception as exc:  # Tk fallback may still work for PNG/GIF.
                 pil_error = exc
         else:
