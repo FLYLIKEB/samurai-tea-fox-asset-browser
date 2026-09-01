@@ -23,6 +23,8 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         self.project_root = project_root
         self.asset_root = asset_root
         self.scale_var = tk.IntVar(value=scale)
+        self.resize_size_var = tk.StringVar(value="32x32")
+        self.transparent_color_var = tk.StringVar(value="#ffffff")
         self.palette_preview_var = tk.BooleanVar(value=False)
         self.bottom_panel_visible = tk.BooleanVar(value=False)
         self.filter_var = tk.StringVar()

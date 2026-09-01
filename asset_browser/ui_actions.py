@@ -6,15 +6,23 @@ from pathlib import Path
 import subprocess
 import time
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import colorchooser, filedialog, messagebox
 
 from .constants import ART_STYLE_TOKENS_PATH, BUILTIN_PROMPT_TEMPLATE
 from .crop_window import ImageCropWindow
-from .image_ops import Image, apply_palette_to_images, is_larger_than_tile
+from .image_ops import (
+    Image,
+    apply_palette_to_images,
+    apply_transparency_to_images,
+    default_resize_output_path,
+    is_larger_than_tile,
+    parse_image_size,
+    resize_image_to_file,
+)
 from .paths import palette_backup_root, template_path
 from .prompting import load_prompt_template, render_prompt_template, save_prompt_template
 from .scanner import find_images
-from .style_tokens import extract_palette_colors
+from .style_tokens import extract_palette_colors, hex_to_rgb, normalize_hex_color
 
 class ActionsMixin:
     def choose_root(self) -> None:
@@ -89,6 +97,38 @@ class ActionsMixin:
 
     def selected_absolute_paths(self) -> list[str]:
         return [str(item.path) for item in self.selected_assets()]
+
+    def delete_selected_images(self) -> None:
+        assets = self.selected_assets()
+        if not assets:
+            self._warn_no_selection()
+            return
+
+        preview = "\n".join(item.relative_path.as_posix() for item in assets[:8])
+        if len(assets) > 8:
+            preview = f"{preview}\n..."
+        ok = messagebox.askokcancel(
+            "선택 이미지 삭제",
+            f"선택한 이미지 {len(assets)}개를 실제 삭제합니다.\n\n{preview}\n\n계속할까요?",
+        )
+        if not ok:
+            return
+
+        deleted = 0
+        failures: list[str] = []
+        for asset in assets:
+            try:
+                asset.path.unlink()
+                deleted += 1
+            except Exception as exc:
+                failures.append(f"{asset.relative_path.as_posix()}: {exc}")
+
+        self.selected.clear()
+        self.rescan()
+        if failures:
+            self._copy_text("\n".join(failures) + "\n", "삭제 실패 목록")
+            messagebox.showwarning("일부 삭제 실패", f"{deleted}개 삭제, {len(failures)}개 실패")
+        self.status_var.set(f"삭제 완료: {deleted}개")
 
     def copy_relative_paths(self) -> None:
         self._copy_lines(self.selected_relative_paths(), "상대경로")
@@ -260,6 +300,93 @@ class ActionsMixin:
             return
         Path(target).write_text("\n".join(paths) + "\n", encoding="utf-8")
         self.status_var.set(f"{len(paths)}개 경로를 저장했습니다: {target}")
+
+    def resize_selected_images(self) -> None:
+        if Image is None:
+            messagebox.showerror("Pillow 필요", "이미지 리사이즈에는 Pillow가 필요합니다.")
+            return
+
+        assets = self.selected_assets()
+        if not assets:
+            self._warn_no_selection()
+            return
+
+        try:
+            size = parse_image_size(self.resize_size_var.get())
+        except Exception as exc:
+            messagebox.showerror("크기 오류", str(exc))
+            return
+
+        saved: list[Path] = []
+        failures: list[str] = []
+        for asset in assets:
+            try:
+                target = default_resize_output_path(asset.path, size)
+                resize_image_to_file(asset.path, target, size)
+                saved.append(target)
+            except Exception as exc:
+                failures.append(f"{asset.relative_path.as_posix()}: {exc}")
+
+        self.rescan()
+        if failures:
+            self._copy_text("\n".join(failures) + "\n", "리사이즈 실패 목록")
+            messagebox.showwarning("일부 리사이즈 실패", f"{len(saved)}개 저장, {len(failures)}개 실패")
+        self.status_var.set(f"리사이즈 저장 완료: {len(saved)}개 | {size[0]}x{size[1]}")
+
+    def choose_transparent_color(self) -> None:
+        _rgb, hex_color = colorchooser.askcolor(
+            color=self.transparent_color_var.get(),
+            title="투명하게 바꿀 배경색 선택",
+        )
+        if not hex_color:
+            return
+        self.transparent_color_var.set(normalize_hex_color(hex_color))
+        self.refresh_transparent_color_swatch()
+
+    def refresh_transparent_color_swatch(self) -> None:
+        color = normalize_hex_color(self.transparent_color_var.get())
+        rgb = hex_to_rgb(color)
+        if rgb is None:
+            return
+        self.transparent_color_var.set(color)
+        self.transparent_color_swatch.configure(bg=color, activebackground=color)
+
+    def apply_transparency_to_selected_images(self) -> None:
+        if Image is None:
+            messagebox.showerror("Pillow 필요", "배경 투명화에는 Pillow가 필요합니다.")
+            return
+
+        assets = self.selected_assets()
+        if not assets:
+            self._warn_no_selection()
+            return
+
+        color = normalize_hex_color(self.transparent_color_var.get())
+        rgb = hex_to_rgb(color)
+        if rgb is None:
+            messagebox.showerror("색상 오류", f"잘못된 색상입니다: {self.transparent_color_var.get()}")
+            return
+
+        backup_root = palette_backup_root(self.project_root)
+        ok = messagebox.askokcancel(
+            "배경 투명화 확인",
+            f"선택한 이미지 {len(assets)}개에서 {color} 색상을 투명으로 실제 변경합니다.\n\n"
+            f"백업 위치: {backup_root}\n\n계속할까요?",
+        )
+        if not ok:
+            return
+
+        converted, failures = apply_transparency_to_images(
+            [asset.path for asset in assets],
+            rgb,
+            self.project_root,
+            backup_root,
+        )
+        self.rescan()
+        if failures:
+            self._copy_text("\n".join(failures) + "\n", "투명화 실패 목록")
+            messagebox.showwarning("일부 투명화 실패", f"{converted}개 변환, {len(failures)}개 실패")
+        self.status_var.set(f"배경 투명화 완료: {converted}개 | 색상 {color} | 백업: {backup_root}")
 
     def _copy_lines(self, lines: list[str], label: str) -> None:
         if not lines:

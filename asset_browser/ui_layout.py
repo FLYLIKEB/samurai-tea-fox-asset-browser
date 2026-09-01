@@ -11,6 +11,7 @@ from .constants import (
     BORDER,
     MUTED,
     PANEL,
+    RESIZE_CHOICES,
     SCALE_CHOICES,
     TEXT,
 )
@@ -55,15 +56,50 @@ class LayoutMixin:
         actions = tk.Frame(self, bg=BG, padx=8, pady=5)
         actions.pack(side=tk.TOP, fill=tk.X)
 
-        self._button(actions, "전체 선택", self.select_all).pack(side=tk.LEFT, padx=(0, 4))
-        self._button(actions, "선택 해제", self.clear_selection).pack(side=tk.LEFT, padx=(0, 8))
-        self._button(actions, "상대경로 복사", self.copy_relative_paths).pack(side=tk.LEFT, padx=(0, 4))
-        self._button(actions, "절대경로 복사", self.copy_absolute_paths).pack(side=tk.LEFT, padx=(0, 4))
-        self._button(actions, "Codex 프롬프트 복사", self.copy_codex_prompt).pack(
+        self._button(actions, "전체", self.select_all).pack(side=tk.LEFT, padx=(0, 4))
+        self._button(actions, "해제", self.clear_selection).pack(side=tk.LEFT, padx=(0, 4))
+        self._button(actions, "삭제", self.delete_selected_images).pack(side=tk.LEFT, padx=(0, 8))
+        self._button(actions, "상대경로", self.copy_relative_paths).pack(side=tk.LEFT, padx=(0, 4))
+        self._button(actions, "절대경로", self.copy_absolute_paths).pack(side=tk.LEFT, padx=(0, 4))
+        self._button(actions, "프롬프트", self.copy_codex_prompt).pack(
             side=tk.LEFT, padx=(0, 4)
         )
         self._button(actions, "TXT 저장", self.save_txt).pack(side=tk.LEFT)
-        self._button(actions, "표시 이미지 실제 변환", self.apply_palette_to_shown_images).pack(
+        resize_box = tk.OptionMenu(actions, self.resize_size_var, *RESIZE_CHOICES)
+        resize_box.configure(bg=BG, fg=TEXT, activebackground=PANEL, relief=tk.FLAT, width=7)
+        resize_box["menu"].configure(bg=BG, fg=TEXT)
+        resize_box.pack(side=tk.LEFT, padx=(8, 3))
+        self._button(actions, "리사이즈", self.resize_selected_images).pack(
+            side=tk.LEFT, padx=(0, 8)
+        )
+        self.transparent_color_swatch = tk.Button(
+            actions,
+            text="",
+            command=self.choose_transparent_color,
+            bg=self.transparent_color_var.get(),
+            activebackground=self.transparent_color_var.get(),
+            relief=tk.FLAT,
+            width=2,
+            padx=0,
+            pady=3,
+            highlightthickness=0,
+        )
+        self.transparent_color_swatch.pack(side=tk.LEFT, padx=(0, 3))
+        transparent_entry = tk.Entry(
+            actions,
+            textvariable=self.transparent_color_var,
+            bg=PANEL,
+            fg=TEXT,
+            relief=tk.FLAT,
+            width=8,
+            insertbackground=TEXT,
+        )
+        transparent_entry.pack(side=tk.LEFT, padx=(0, 3))
+        transparent_entry.bind("<KeyRelease>", lambda _event: self.refresh_transparent_color_swatch())
+        self._button(actions, "투명화", self.apply_transparency_to_selected_images).pack(
+            side=tk.LEFT, padx=(0, 8)
+        )
+        self._button(actions, "팔레트 변환", self.apply_palette_to_shown_images).pack(
             side=tk.LEFT, padx=(8, 0)
         )
         preview_toggle = tk.Checkbutton(

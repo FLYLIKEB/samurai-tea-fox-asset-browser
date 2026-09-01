@@ -10,6 +10,7 @@ from .constants import BG, BORDER, MUTED, PANEL, SELECTED, TEXT
 from .image_ops import (
     Image,
     ImageTk,
+    crop_boxes_to_files,
     crop_image_to_file,
     default_crop_output_path,
     normalize_crop_box,
@@ -35,8 +36,10 @@ class ImageCropWindow(tk.Toplevel):
         self.scale = self._initial_scale()
         self.start: tuple[int, int] | None = None
         self.box: tuple[int, int, int, int] | None = None
+        self.queued_boxes: list[tuple[int, int, int, int]] = []
         self.preview_ref: tk.PhotoImage | None = None
         self.rect_id: int | None = None
+        self.queued_rect_ids: list[int] = []
         self.last_saved_path: Path | None = None
 
         self.title(f"이미지 크롭 - {asset.relative_path.name}")
@@ -63,8 +66,11 @@ class ImageCropWindow(tk.Toplevel):
             anchor="w",
         ).pack(side=tk.LEFT, fill=tk.X, expand=True)
 
-        self._button(header, "32x32 맞춤", self.fit_32).pack(side=tk.RIGHT, padx=(6, 0))
+        self._button(header, "초기화", self.clear_queued_boxes).pack(side=tk.RIGHT, padx=(6, 0))
+        self._button(header, "모두 저장", self.save_all_crops).pack(side=tk.RIGHT, padx=(6, 0))
+        self._button(header, "영역 추가", self.queue_current_box).pack(side=tk.RIGHT, padx=(6, 0))
         self._button(header, "저장", self.save_crop).pack(side=tk.RIGHT, padx=(6, 0))
+        self._button(header, "32x32 맞춤", self.fit_32).pack(side=tk.RIGHT, padx=(6, 0))
 
         info = tk.Label(self, textvariable=self.info_var, bg=BG, fg=MUTED, anchor="w", padx=10, pady=5)
         info.pack(side=tk.TOP, fill=tk.X)
@@ -87,6 +93,10 @@ class ImageCropWindow(tk.Toplevel):
         self.canvas.bind("<B1-Motion>", self._drag_crop)
         self.canvas.bind("<ButtonRelease-1>", self._finish_crop)
         self.bind("<Escape>", lambda _event: self.destroy())
+        self.bind("<Return>", lambda _event: self.queue_current_box())
+        self.bind("<space>", lambda _event: self.queue_current_box())
+        self.bind("<Command-s>", lambda _event: self.save_shortcut())
+        self.bind("<Control-s>", lambda _event: self.save_shortcut())
 
     def _button(self, parent: tk.Widget, text: str, command) -> tk.Button:
         return tk.Button(
@@ -165,6 +175,8 @@ class ImageCropWindow(tk.Toplevel):
             return
         x1, y1, x2, y2 = self.box
         status = f"선택 영역: x={x1}, y={y1}, w={x2 - x1}, h={y2 - y1}"
+        if self.queued_boxes:
+            status = f"{status} | 대기 {len(self.queued_boxes)}개"
         if self.last_saved_path is not None:
             status = f"{status} | 마지막 저장: {self.last_saved_path.name}"
         self.info_var.set(status)
@@ -177,10 +189,42 @@ class ImageCropWindow(tk.Toplevel):
         if box is not None:
             self._set_box(box)
 
-    def save_crop(self) -> None:
+    def queue_current_box(self) -> str:
+        if self.box is None:
+            messagebox.showinfo("선택 없음", "추가할 크롭 영역을 먼저 선택하세요.")
+            return "break"
+
+        self.queued_boxes.append(self.box)
+        x1, y1, x2, y2 = self.box
+        rect_id = self.canvas.create_rectangle(
+            x1 * self.scale,
+            y1 * self.scale,
+            x2 * self.scale,
+            y2 * self.scale,
+            outline=MUTED,
+            width=1,
+        )
+        self.queued_rect_ids.append(rect_id)
+        self._show_box_status()
+        return "break"
+
+    def clear_queued_boxes(self) -> str:
+        for rect_id in self.queued_rect_ids:
+            self.canvas.delete(rect_id)
+        self.queued_boxes.clear()
+        self.queued_rect_ids.clear()
+        self._show_box_status()
+        return "break"
+
+    def save_shortcut(self) -> str:
+        if self.queued_boxes:
+            return self.save_all_crops()
+        return self.save_crop()
+
+    def save_crop(self) -> str:
         if self.box is None:
             messagebox.showinfo("선택 없음", "크롭할 영역을 먼저 선택하세요.")
-            return
+            return "break"
 
         target = default_crop_output_path(self.asset.path, self.box)
 
@@ -188,8 +232,29 @@ class ImageCropWindow(tk.Toplevel):
             crop_image_to_file(self.asset.path, target, self.box)
         except Exception as exc:
             messagebox.showerror("크롭 저장 실패", str(exc))
-            return
+            return "break"
 
         self.last_saved_path = target
         self.on_saved(target)
         self._show_box_status()
+        return "break"
+
+    def save_all_crops(self) -> str:
+        boxes = list(self.queued_boxes)
+        if not boxes and self.box is not None:
+            boxes = [self.box]
+        if not boxes:
+            messagebox.showinfo("선택 없음", "저장할 크롭 영역을 먼저 선택하세요.")
+            return "break"
+
+        try:
+            saved_paths = crop_boxes_to_files(self.asset.path, boxes)
+        except Exception as exc:
+            messagebox.showerror("크롭 저장 실패", str(exc))
+            return "break"
+
+        self.last_saved_path = saved_paths[-1]
+        self.on_saved(saved_paths[-1])
+        self.clear_queued_boxes()
+        self._show_box_status()
+        return "break"

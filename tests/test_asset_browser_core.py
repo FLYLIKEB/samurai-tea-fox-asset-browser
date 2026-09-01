@@ -114,6 +114,20 @@ class AssetBrowserCoreTest(unittest.TestCase):
 
         self.assertEqual(target.name, "sheet_crop_0_0_32x32_2.png")
 
+    def test_parse_image_size_accepts_width_height_text(self) -> None:
+        self.assertEqual(core.parse_image_size("32x64"), (32, 64))
+        self.assertEqual(core.parse_image_size(" 64 X 32 "), (64, 32))
+
+    def test_default_resize_output_path_uses_png_and_avoids_collisions(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "tile.jpg"
+            existing = Path(tmp) / "tile_resize_32x32.png"
+            existing.write_bytes(b"already here")
+
+            target = core.default_resize_output_path(source, (32, 32))
+
+        self.assertEqual(target.name, "tile_resize_32x32_2.png")
+
     @unittest.skipIf(core.Image is None, "Pillow is not installed")
     def test_crop_image_to_file_saves_original_pixel_region(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -128,6 +142,47 @@ class AssetBrowserCoreTest(unittest.TestCase):
             with core.Image.open(target) as cropped:
                 self.assertEqual(cropped.size, (1, 1))
                 self.assertEqual(cropped.convert("RGBA").getpixel((0, 0)), (255, 0, 0, 255))
+
+    @unittest.skipIf(core.Image is None, "Pillow is not installed")
+    def test_crop_boxes_to_files_saves_multiple_files(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "source.png"
+            image = core.Image.new("RGBA", (4, 4), (0, 0, 0, 0))
+            image.putpixel((0, 0), (255, 0, 0, 255))
+            image.putpixel((1, 0), (0, 255, 0, 255))
+            image.save(source)
+
+            saved = core.crop_boxes_to_files(source, [(0, 0, 1, 1), (1, 0, 2, 1)])
+
+            self.assertEqual([path.name for path in saved], [
+                "source_crop_0_0_1x1.png",
+                "source_crop_1_0_1x1.png",
+            ])
+            self.assertTrue(all(path.exists() for path in saved))
+
+    @unittest.skipIf(core.Image is None, "Pillow is not installed")
+    def test_resize_image_to_file_uses_nearest_size(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "source.png"
+            target = Path(tmp) / "resize.png"
+            core.Image.new("RGBA", (2, 2), (255, 0, 0, 255)).save(source)
+
+            core.resize_image_to_file(source, target, (4, 8))
+
+            with core.Image.open(target) as resized:
+                self.assertEqual(resized.size, (4, 8))
+
+    @unittest.skipIf(core.Image is None, "Pillow is not installed")
+    def test_make_color_transparent_only_changes_matching_opaque_pixels(self) -> None:
+        image = core.Image.new("RGBA", (3, 1))
+        image.putdata([(255, 255, 255, 255), (255, 255, 255, 0), (1, 2, 3, 255)])
+
+        converted = core.make_color_transparent(image, (255, 255, 255))
+
+        self.assertEqual(
+            list(converted.getdata()),
+            [(255, 255, 255, 0), (255, 255, 255, 0), (1, 2, 3, 255)],
+        )
 
 if __name__ == "__main__":
     unittest.main()

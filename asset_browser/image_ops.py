@@ -105,6 +105,87 @@ def crop_image_to_file(source: Path, target: Path, box: tuple[int, int, int, int
             cropped = cropped.convert("RGB")
         cropped.save(target)
 
+def crop_boxes_to_files(source: Path, boxes: list[tuple[int, int, int, int]]) -> list[Path]:
+    saved_paths: list[Path] = []
+    for box in boxes:
+        target = default_crop_output_path(source, box)
+        crop_image_to_file(source, target, box)
+        saved_paths.append(target)
+    return saved_paths
+
+def parse_image_size(value: str) -> tuple[int, int]:
+    normalized = value.lower().replace(" ", "")
+    width_text, separator, height_text = normalized.partition("x")
+    if separator != "x":
+        raise ValueError(f"잘못된 크기 형식: {value}")
+
+    width = int(width_text)
+    height = int(height_text)
+    if width <= 0 or height <= 0:
+        raise ValueError(f"크기는 1 이상이어야 합니다: {value}")
+    return width, height
+
+def default_resize_output_path(source: Path, size: tuple[int, int]) -> Path:
+    width, height = size
+    candidate = source.with_name(f"{source.stem}_resize_{width}x{height}.png")
+    index = 2
+    while candidate.exists():
+        candidate = source.with_name(f"{source.stem}_resize_{width}x{height}_{index}.png")
+        index += 1
+    return candidate
+
+def resize_image_to_file(source: Path, target: Path, size: tuple[int, int]) -> None:
+    if Image is None:
+        raise RuntimeError("이미지 리사이즈에는 Pillow가 필요합니다.")
+
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with Image.open(source) as opened:
+        resampling = getattr(Image, "Resampling", Image)
+        resized = opened.convert("RGBA").resize(size, resampling.NEAREST)
+        resized.save(target)
+
+def make_color_transparent(image, rgb: tuple[int, int, int]):
+    image = image.convert("RGBA")
+    transparent = []
+    for red, green, blue, alpha in image.getdata():
+        if alpha > 0 and (red, green, blue) == rgb:
+            transparent.append((red, green, blue, 0))
+        else:
+            transparent.append((red, green, blue, alpha))
+
+    converted = Image.new("RGBA", image.size)
+    converted.putdata(transparent)
+    return converted
+
+def save_color_transparent_image(path: Path, rgb: tuple[int, int, int]) -> None:
+    if Image is None:
+        raise RuntimeError("배경 투명화에는 Pillow가 필요합니다.")
+
+    with Image.open(path) as opened:
+        converted = make_color_transparent(opened, rgb)
+        converted.save(path)
+
+def apply_transparency_to_images(
+    image_paths: list[Path],
+    rgb: tuple[int, int, int],
+    project_root: Path,
+    backup_root: Path,
+) -> tuple[int, list[str]]:
+    converted = 0
+    failures: list[str] = []
+
+    for path in image_paths:
+        try:
+            backup_path = backup_root / relative_or_name(path, project_root)
+            backup_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(path, backup_path)
+            save_color_transparent_image(path, rgb)
+            converted += 1
+        except Exception as exc:
+            failures.append(f"{path}: {exc}")
+
+    return converted, failures
+
 def apply_palette_to_images(
     image_paths: list[Path],
     palette: list[tuple[int, int, int]],
