@@ -19,6 +19,7 @@ IMAGE_EXTENSIONS = {
 }
 
 SCALE_CHOICES = (2, 3, 4, 5, 6, 8)
+ADJUSTMENT_CHOICES = ("대비", "밝기", "채도", "선명도")
 RESIZE_CHOICES = (
     "32x32",
     "32x64",

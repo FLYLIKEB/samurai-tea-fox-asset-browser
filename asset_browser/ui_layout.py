@@ -6,6 +6,7 @@ import tkinter as tk
 from tkinter import ttk
 
 from .constants import (
+    ADJUSTMENT_CHOICES,
     ART_STYLE_TOKENS_PATH,
     BG,
     BORDER,
@@ -77,6 +78,8 @@ class LayoutMixin:
         action_row.pack(side=tk.TOP, fill=tk.X)
         image_row = tk.Frame(actions, bg=BG)
         image_row.pack(side=tk.TOP, fill=tk.X, pady=(4, 0))
+        adjust_row = tk.Frame(actions, bg=BG)
+        adjust_row.pack(side=tk.TOP, fill=tk.X, pady=(4, 0))
 
         self._button(action_row, "✓ 전체 (⌘A)", self.select_all, width=11).pack(
             side=tk.LEFT, padx=(0, 4)
@@ -187,6 +190,27 @@ class LayoutMixin:
             anchor="w",
         )
         preview_toggle.pack(side=tk.LEFT)
+
+        adjustment_box = tk.OptionMenu(adjust_row, self.adjustment_kind_var, *ADJUSTMENT_CHOICES)
+        adjustment_box.configure(bg=BG, fg=TEXT, activebackground=PANEL, relief=tk.FLAT, width=7)
+        adjustment_box["menu"].configure(bg=BG, fg=TEXT)
+        adjustment_box.pack(side=tk.LEFT, padx=(0, 4))
+        adjustment_percent = tk.Spinbox(
+            adjust_row,
+            from_=-100,
+            to=300,
+            textvariable=self.adjustment_percent_var,
+            width=5,
+            bg=PANEL,
+            fg=TEXT,
+            relief=tk.FLAT,
+            increment=5,
+        )
+        adjustment_percent.pack(side=tk.LEFT, padx=(0, 3))
+        tk.Label(adjust_row, text="%", bg=BG, fg=MUTED).pack(side=tk.LEFT, padx=(0, 4))
+        self._button(adjust_row, "◐ 보정 적용 (⌘Y)", self.adjust_selected_images, width=15).pack(
+            side=tk.LEFT
+        )
 
         self.bottom_panel = tk.Frame(self, bg=PANEL, padx=8, pady=3)
         self.bottom_panel.pack(side=tk.BOTTOM, fill=tk.X)
@@ -426,6 +450,7 @@ class LayoutMixin:
         self._shortcut("<Command-c>", self.copy_codex_prompt)
         self._shortcut("<Command-t>", self.save_txt)
         self._shortcut("<Command-z>", self.resize_selected_images)
+        self._shortcut("<Command-y>", self.adjust_selected_images)
         self._shortcut("<Command-g>", self.apply_transparency_to_selected_images)
         self._shortcut("<Command-k>", self.choose_transparent_color)
         self._shortcut("<Command-p>", self.apply_palette_to_shown_images)

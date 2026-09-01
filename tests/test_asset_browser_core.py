@@ -259,6 +259,19 @@ class AssetBrowserCoreTest(unittest.TestCase):
         self.assertIn("64x96", core.RESIZE_CHOICES)
         self.assertIn("96x128", core.RESIZE_CHOICES)
 
+    def test_adjustment_factor_clamps_percent_range(self) -> None:
+        self.assertEqual(core.adjustment_factor(-150), 0.0)
+        self.assertEqual(core.adjustment_factor(20), 1.2)
+        self.assertEqual(core.adjustment_factor(400), 4.0)
+
+    @unittest.skipIf(core.Image is None, "Pillow is not installed")
+    def test_adjust_image_brightness_preserves_alpha(self) -> None:
+        image = core.Image.new("RGBA", (1, 1), (10, 20, 30, 77))
+
+        adjusted = core.adjust_image(image, "밝기", 100)
+
+        self.assertEqual(adjusted.getpixel((0, 0)), (20, 40, 60, 77))
+
     def test_default_resize_output_path_uses_png_and_avoids_collisions(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             source = Path(tmp) / "tile.jpg"

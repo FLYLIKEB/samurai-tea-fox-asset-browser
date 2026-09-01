@@ -8,9 +8,10 @@ from pathlib import Path
 from .paths import relative_or_name
 
 try:
-    from PIL import Image, ImageTk
+    from PIL import Image, ImageEnhance, ImageTk
 except ImportError:  # Pillow is optional; Tk can still load PNG/GIF/PPM/PGM.
     Image = None
+    ImageEnhance = None
     ImageTk = None
 
 def nearest_palette_color(
@@ -144,6 +145,42 @@ def resize_image_to_file(source: Path, target: Path, size: tuple[int, int]) -> N
         resized = opened.convert("RGBA").resize(size, resampling.NEAREST)
         resized.save(target)
 
+def adjustment_factor(percent: int) -> float:
+    return max(0.0, 1.0 + max(-100, min(300, percent)) / 100)
+
+def adjust_image(image, kind: str, percent: int):
+    if Image is None or ImageEnhance is None:
+        raise RuntimeError("이미지 보정에는 Pillow가 필요합니다.")
+
+    enhancer_by_kind = {
+        "대비": ImageEnhance.Contrast,
+        "contrast": ImageEnhance.Contrast,
+        "밝기": ImageEnhance.Brightness,
+        "brightness": ImageEnhance.Brightness,
+        "채도": ImageEnhance.Color,
+        "saturation": ImageEnhance.Color,
+        "선명도": ImageEnhance.Sharpness,
+        "sharpness": ImageEnhance.Sharpness,
+    }
+    enhancer_class = enhancer_by_kind.get(kind)
+    if enhancer_class is None:
+        raise ValueError(f"지원하지 않는 보정입니다: {kind}")
+
+    rgba = image.convert("RGBA")
+    alpha = rgba.getchannel("A")
+    adjusted = enhancer_class(rgba.convert("RGB")).enhance(adjustment_factor(percent))
+    adjusted = adjusted.convert("RGBA")
+    adjusted.putalpha(alpha)
+    return adjusted
+
+def save_adjusted_image(path: Path, kind: str, percent: int) -> None:
+    if Image is None:
+        raise RuntimeError("이미지 보정에는 Pillow가 필요합니다.")
+
+    with Image.open(path) as opened:
+        adjusted = adjust_image(opened, kind, percent)
+        save_rgba_image_to_file(adjusted, path)
+
 def color_within_tolerance(
     pixel_rgb: tuple[int, int, int],
     target_rgb: tuple[int, int, int],
@@ -265,6 +302,28 @@ def apply_palette_to_images(
             backup_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(path, backup_path)
             save_recolored_image(path, palette)
+            converted += 1
+        except Exception as exc:
+            failures.append(f"{path}: {exc}")
+
+    return converted, failures
+
+def apply_adjustment_to_images(
+    image_paths: list[Path],
+    kind: str,
+    percent: int,
+    project_root: Path,
+    backup_root: Path,
+) -> tuple[int, list[str]]:
+    converted = 0
+    failures: list[str] = []
+
+    for path in image_paths:
+        try:
+            backup_path = backup_root / relative_or_name(path, project_root)
+            backup_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(path, backup_path)
+            save_adjusted_image(path, kind, percent)
             converted += 1
         except Exception as exc:
             failures.append(f"{path}: {exc}")

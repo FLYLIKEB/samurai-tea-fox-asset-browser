@@ -13,13 +13,14 @@ from .crop_window import ImageCropWindow
 from .file_ops import move_files_to_directory
 from .image_ops import (
     Image,
+    apply_adjustment_to_images,
     apply_palette_to_images,
     apply_transparency_to_images,
     default_resize_output_path,
     parse_image_size,
     resize_image_to_file,
 )
-from .paths import palette_backup_root, template_path
+from .paths import adjustment_backup_root, palette_backup_root, template_path
 from .prompting import load_prompt_template, render_prompt_template, save_prompt_template
 from .scanner import find_images
 from .style_tokens import extract_palette_colors, hex_to_rgb, normalize_hex_color
@@ -451,6 +452,44 @@ class ActionsMixin:
             self._copy_text("\n".join(failures) + "\n", "리사이즈 실패 목록")
             messagebox.showwarning("일부 리사이즈 실패", f"{len(saved)}개 저장, {len(failures)}개 실패")
         self.status_var.set(f"리사이즈 저장 완료: {len(saved)}개 | {size[0]}x{size[1]}")
+
+    def adjust_selected_images(self) -> None:
+        if Image is None:
+            messagebox.showerror("Pillow 필요", "이미지 보정에는 Pillow가 필요합니다.")
+            return
+
+        assets = self.selected_assets()
+        if not assets:
+            self._warn_no_selection()
+            return
+
+        kind = self.adjustment_kind_var.get()
+        percent = self.adjustment_percent_var.get()
+        backup_root = adjustment_backup_root(self.project_root)
+        preview = "\n".join(item.relative_path.as_posix() for item in assets[:8])
+        if len(assets) > 8:
+            preview = f"{preview}\n..."
+        ok = messagebox.askokcancel(
+            "선택 이미지 보정",
+            f"선택한 이미지 {len(assets)}개에 {kind} {percent:+d}% 보정을 실제 적용합니다.\n\n"
+            f"{preview}\n\n"
+            f"백업 위치: {backup_root}\n\n계속할까요?",
+        )
+        if not ok:
+            return
+
+        converted, failures = apply_adjustment_to_images(
+            [asset.path for asset in assets],
+            kind,
+            percent,
+            self.project_root,
+            backup_root,
+        )
+        self.rescan()
+        if failures:
+            self._copy_text("\n".join(failures) + "\n", "보정 실패 목록")
+            messagebox.showwarning("일부 보정 실패", f"{converted}개 보정, {len(failures)}개 실패")
+        self.status_var.set(f"보정 완료: {converted}개 | {kind} {percent:+d}% | 백업: {backup_root}")
 
     def choose_transparent_color(self) -> None:
         _rgb, hex_color = colorchooser.askcolor(

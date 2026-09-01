@@ -13,6 +13,7 @@ if __package__ in {None, ""}:
 
 from asset_browser.cli import main, parse_args
 from asset_browser.constants import (
+    ADJUSTMENT_CHOICES,
     ART_STYLE_TOKENS_PATH,
     BG,
     BORDER,
@@ -32,6 +33,9 @@ from asset_browser.file_ops import move_files_to_directory, unique_destination_p
 from asset_browser.image_ops import (
     Image,
     ImageTk,
+    adjust_image,
+    adjustment_factor,
+    apply_adjustment_to_images,
     apply_palette_to_images,
     apply_transparency_to_images,
     color_within_tolerance,
@@ -49,11 +53,13 @@ from asset_browser.image_ops import (
     recolor_image_to_palette,
     resize_image_to_file,
     save_color_transparent_image,
+    save_adjusted_image,
     save_rgba_image_to_file,
     save_recolored_image,
 )
 from asset_browser.models import AssetImage
 from asset_browser.paths import (
+    adjustment_backup_root,
     paint_backup_root,
     palette_backup_root,
     project_root_from_script,
@@ -89,6 +95,7 @@ __all__ = [
     "ART_STYLE_TOKENS_PATH",
     "AssetBrowser",
     "AssetImage",
+    "ADJUSTMENT_CHOICES",
     "BG",
     "BORDER",
     "BUILTIN_PROMPT_TEMPLATE",
@@ -105,6 +112,10 @@ __all__ = [
     "SELECTED",
     "SELECTED_TEXT",
     "TEXT",
+    "adjust_image",
+    "adjustment_backup_root",
+    "adjustment_factor",
+    "apply_adjustment_to_images",
     "apply_palette_to_images",
     "apply_palette_candidate",
     "apply_transparency_to_images",
@@ -143,6 +154,7 @@ __all__ = [
     "relative_or_name",
     "render_prompt_template",
     "resize_image_to_file",
+    "save_adjusted_image",
     "save_color_transparent_image",
     "save_art_style_tokens",
     "save_prompt_template",
