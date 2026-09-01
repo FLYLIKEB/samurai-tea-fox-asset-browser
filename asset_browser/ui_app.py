@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import math
 from pathlib import Path
 import tkinter as tk
@@ -16,6 +17,14 @@ from .style_tokens import extract_palette_colors
 from .ui_actions import ActionsMixin
 from .ui_layout import LayoutMixin
 from .ui_palette import PalettePanelMixin
+
+@dataclass
+class AssetCellWidgets:
+    cell: tk.Frame
+    image_box: tk.Frame
+    image_label: tk.Label
+    name_label: tk.Label
+    detail_label: tk.Label
 
 class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
     def __init__(self, project_root: Path, asset_root: Path, scale: int) -> None:
@@ -32,7 +41,10 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         self.path_var = tk.StringVar(value=str(asset_root))
         self.images: list[AssetImage] = []
         self.filtered_images: list[AssetImage] = []
+        self.image_by_path: dict[Path, AssetImage] = {}
+        self.image_order_by_path: dict[Path, int] = {}
         self.selected: set[Path] = set()
+        self.cell_widgets: dict[Path, AssetCellWidgets] = {}
         self.thumbnail_refs: list[tk.PhotoImage] = []
         self.prompt_template = load_prompt_template(project_root)
         self.art_style_data: dict | None = None
@@ -56,6 +68,7 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         for child in self.grid_frame.winfo_children():
             child.destroy()
         self.thumbnail_refs.clear()
+        self.cell_widgets.clear()
 
         if not self.filtered_images:
             tk.Label(
@@ -106,10 +119,7 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         title.pack(side=tk.LEFT)
 
     def _add_cell(self, item: AssetImage, row: int, column: int) -> None:
-        is_selected = item.path in self.selected
-        bg = SELECTED if is_selected else BG
-        fg = SELECTED_TEXT if is_selected else TEXT
-        meta_fg = SELECTED_TEXT if is_selected else MUTED
+        bg, fg, meta_fg = self._cell_colors(item.path in self.selected)
 
         cell = tk.Frame(
             self.grid_frame,
@@ -176,6 +186,40 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         for widget in (cell, image_box, image_label, name_label, detail_label):
             widget.bind("<Button-1>", lambda _event, asset=item: self.schedule_toggle_selection(asset))
             widget.bind("<Double-Button-1>", lambda _event, asset=item: self.open_crop_or_copy_prompt(asset))
+
+        self.cell_widgets[item.path] = AssetCellWidgets(
+            cell=cell,
+            image_box=image_box,
+            image_label=image_label,
+            name_label=name_label,
+            detail_label=detail_label,
+        )
+
+    def update_cell_selection(self, path: Path) -> None:
+        widgets = self.cell_widgets.get(path)
+        if widgets is None:
+            return
+
+        is_selected = path in self.selected
+        bg, fg, meta_fg = self._cell_colors(is_selected)
+        widgets.cell.configure(bg=bg, highlightbackground=SELECTED if is_selected else BORDER)
+        widgets.image_box.configure(bg=bg)
+        widgets.image_label.configure(bg=bg)
+        widgets.name_label.configure(bg=bg, fg=fg)
+        widgets.detail_label.configure(bg=bg, fg=meta_fg)
+
+        if not widgets.image_label.cget("image"):
+            widgets.image_label.configure(fg=ERROR if not is_selected else SELECTED_TEXT)
+
+    def update_visible_selection_styles(self) -> None:
+        for path in self.cell_widgets:
+            self.update_cell_selection(path)
+
+    def _cell_colors(self, is_selected: bool) -> tuple[str, str, str]:
+        bg = SELECTED if is_selected else BG
+        fg = SELECTED_TEXT if is_selected else TEXT
+        meta_fg = SELECTED_TEXT if is_selected else MUTED
+        return bg, fg, meta_fg
 
     def _load_thumbnail(self, path: Path) -> tuple[tk.PhotoImage | None, str]:
         scale = max(1, self.scale_var.get())

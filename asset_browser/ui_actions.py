@@ -39,6 +39,8 @@ class ActionsMixin:
         self.asset_root = root
         self.path_var.set(str(root))
         self.images = find_images(root, self.project_root)
+        self.image_by_path = {item.path: item for item in self.images}
+        self.image_order_by_path = {item.path: index for index, item in enumerate(self.images)}
         self.selected = {path for path in self.selected if path in {item.path for item in self.images}}
         self.apply_filter()
         self.update_prompt_preview(force=True)
@@ -58,7 +60,8 @@ class ActionsMixin:
             self.selected.remove(asset.path)
         else:
             self.selected.add(asset.path)
-        self.render_grid()
+        self.update_cell_selection(asset.path)
+        self._set_status()
         self.update_prompt_preview()
 
     def schedule_toggle_selection(self, asset: AssetImage) -> str:
@@ -80,17 +83,25 @@ class ActionsMixin:
 
     def select_all(self) -> None:
         self.selected.update(item.path for item in self.filtered_images)
-        self.render_grid()
+        self.update_visible_selection_styles()
+        self._set_status()
         self.update_prompt_preview()
 
     def clear_selection(self) -> None:
         self.selected.clear()
-        self.render_grid()
+        self.update_visible_selection_styles()
+        self._set_status()
         self.update_prompt_preview()
 
     def selected_assets(self) -> list[AssetImage]:
-        selected = set(self.selected)
-        return [item for item in self.images if item.path in selected]
+        return [
+            self.image_by_path[path]
+            for path in sorted(
+                self.selected,
+                key=lambda selected_path: self.image_order_by_path.get(selected_path, 0),
+            )
+            if path in self.image_by_path
+        ]
 
     def selected_relative_paths(self) -> list[str]:
         return [item.relative_path.as_posix() for item in self.selected_assets()]

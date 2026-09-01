@@ -47,6 +47,31 @@ class AssetBrowserCoreTest(unittest.TestCase):
         self.assertEqual(scaled_size(None, 64, 64, 4), (128, 128))
         self.assertEqual(scaled_size(None, 128, 64, 4), (128, 64))
 
+    def test_toggle_selection_updates_only_one_cell_without_grid_render(self) -> None:
+        browser = core.AssetBrowser.__new__(core.AssetBrowser)
+        asset = core.AssetImage(Path("/project/assets/a.png"), Path("assets/a.png"))
+        calls: list[str] = []
+        browser.selected = set()
+        browser.update_cell_selection = lambda path: calls.append(f"cell:{path.name}")
+        browser._set_status = lambda: calls.append("status")
+        browser.update_prompt_preview = lambda: calls.append("prompt")
+        browser.render_grid = lambda: self.fail("selection should not rebuild the full grid")
+
+        browser.toggle_selection(asset)
+
+        self.assertEqual(browser.selected, {asset.path})
+        self.assertEqual(calls, ["cell:a.png", "status", "prompt"])
+
+    def test_selected_assets_preserves_scan_order_from_cache(self) -> None:
+        browser = core.AssetBrowser.__new__(core.AssetBrowser)
+        first = core.AssetImage(Path("/project/assets/a.png"), Path("assets/a.png"))
+        second = core.AssetImage(Path("/project/assets/b.png"), Path("assets/b.png"))
+        browser.selected = {second.path, first.path}
+        browser.image_by_path = {first.path: first, second.path: second}
+        browser.image_order_by_path = {first.path: 0, second.path: 1}
+
+        self.assertEqual(browser.selected_assets(), [first, second])
+
     def test_render_prompt_template_replaces_known_placeholders(self) -> None:
         prompt = core.render_prompt_template(
             "개수: {asset_count}\n루트: {project_root}\n이미지:\n{asset_list}",
