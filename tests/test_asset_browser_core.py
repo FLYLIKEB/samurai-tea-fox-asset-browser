@@ -112,6 +112,27 @@ class AssetBrowserCoreTest(unittest.TestCase):
         self.assertEqual(scaled_size(None, 32, 64, core.PREVIEW_SCALE), (64, 128))
         self.assertEqual(scaled_size(None, 64, 64, core.PREVIEW_SCALE), core.SUMMARY_PREVIEW_SIZE)
 
+    @unittest.skipIf(core.Image is None, "Pillow is not installed")
+    def test_image_info_reports_transparency(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            transparent = Path(tmp) / "transparent.png"
+            opaque = Path(tmp) / "opaque.png"
+            core.Image.new("RGBA", (2, 1), (0, 0, 0, 0)).save(transparent)
+            core.Image.new("RGBA", (2, 1), (0, 0, 0, 255)).save(opaque)
+
+            self.assertEqual(core.image_info(transparent), ((2, 1), True))
+            self.assertEqual(core.image_info(opaque), ((2, 1), False))
+
+    @unittest.skipIf(core.Image is None, "Pillow is not installed")
+    def test_composite_on_checkerboard_reveals_transparent_pixels(self) -> None:
+        image = core.Image.new("RGBA", (2, 1), (10, 20, 30, 255))
+        image.putpixel((1, 0), (10, 20, 30, 0))
+
+        composited = core.composite_on_checkerboard(image, cell_size=1)
+
+        self.assertEqual(composited.getpixel((0, 0)), (10, 20, 30, 255))
+        self.assertEqual(composited.getpixel((1, 0)), (224, 224, 229, 255))
+
     def test_tile_size_group_labels_large_images_as_summary(self) -> None:
         self.assertEqual(core.tile_size_group_label((32, 32)), "32x32")
         self.assertEqual(core.tile_size_group_label((32, 64)), "32x64")
@@ -133,6 +154,23 @@ class AssetBrowserCoreTest(unittest.TestCase):
 
         self.assertEqual(browser.selected, {asset.path})
         self.assertEqual(calls, ["cell:a.png", "status", "prompt"])
+
+    def test_status_includes_visible_transparent_count(self) -> None:
+        browser = core.AssetBrowser.__new__(core.AssetBrowser)
+        transparent = core.AssetImage(Path("/project/assets/a.png"), Path("assets/a.png"))
+        opaque = core.AssetImage(Path("/project/assets/b.png"), Path("assets/b.png"))
+        messages: list[str] = []
+        browser.images = [transparent, opaque]
+        browser.filtered_images = [transparent, opaque]
+        browser.selected = set()
+        browser.prompt_dirty = False
+        browser.template_dirty = False
+        browser.image_has_transparency_by_path = {transparent.path: True, opaque.path: False}
+        browser.status_var = type("StatusVar", (), {"set": lambda _self, value: messages.append(value)})()
+
+        browser._set_status()
+
+        self.assertEqual(messages[-1], "전체 2개 | 표시 2개 | 투명 1개 | 선택 0개")
 
     def test_selected_assets_preserves_scan_order_from_cache(self) -> None:
         browser = core.AssetBrowser.__new__(core.AssetBrowser)

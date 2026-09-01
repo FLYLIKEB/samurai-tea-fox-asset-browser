@@ -63,6 +63,51 @@ def image_size(path: Path) -> tuple[int, int]:
 
     raise RuntimeError("이미지 크기를 읽으려면 Pillow가 필요합니다.")
 
+
+def image_has_transparency(image) -> bool:
+    if Image is None:
+        raise RuntimeError("이미지 투명 여부를 읽으려면 Pillow가 필요합니다.")
+
+    if image.mode == "P" and "transparency" in image.info:
+        return True
+    if "A" not in image.getbands():
+        return False
+    alpha_min, _alpha_max = image.getchannel("A").getextrema()
+    return alpha_min < 255
+
+
+def image_info(path: Path) -> tuple[tuple[int, int], bool]:
+    if Image is None:
+        raise RuntimeError("이미지 정보를 읽으려면 Pillow가 필요합니다.")
+
+    with Image.open(path) as opened:
+        return opened.size, image_has_transparency(opened)
+
+
+def checkerboard_image(size: tuple[int, int], cell_size: int = 4):
+    if Image is None:
+        raise RuntimeError("체커 배경 생성에는 Pillow가 필요합니다.")
+
+    width, height = size
+    board = Image.new("RGBA", size, (255, 255, 255, 255))
+    pixels = board.load()
+    for y in range(height):
+        for x in range(width):
+            if ((x // cell_size) + (y // cell_size)) % 2:
+                pixels[x, y] = (224, 224, 229, 255)
+    return board
+
+
+def composite_on_checkerboard(image, cell_size: int = 4):
+    rgba = image.convert("RGBA")
+    if not image_has_transparency(rgba):
+        return rgba
+
+    board = checkerboard_image(rgba.size, cell_size)
+    board.alpha_composite(rgba)
+    return board
+
+
 def is_larger_than_tile(path: Path, tile_size: int = 32) -> bool:
     width, height = image_size(path)
     return width > tile_size or height > tile_size

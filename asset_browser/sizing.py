@@ -61,4 +61,4 @@ def preview_size_for_image(size: tuple[int, int] | None, scale: int) -> tuple[in
 
 def cell_size_for_preview(preview_size: tuple[int, int]) -> tuple[int, int]:
     width, height = preview_size
-    return max(132, width + 4), max(98, height + 34)
+    return max(132, width + 8), max(112, height + 50)

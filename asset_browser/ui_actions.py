@@ -17,6 +17,7 @@ from .image_ops import (
     apply_palette_to_images,
     apply_transparency_to_images,
     default_resize_output_path,
+    image_info,
     image_size,
     parse_image_size,
     resize_image_to_file,
@@ -43,10 +44,22 @@ class ActionsMixin:
         self.images = find_images(root, self.project_root)
         self.image_by_path = {item.path: item for item in self.images}
         self.image_order_by_path = {item.path: index for index, item in enumerate(self.images)}
-        self.image_size_by_path = {item.path: self._read_image_size(item.path) for item in self.images}
+        image_info_by_path = {item.path: self._read_image_info(item.path) for item in self.images}
+        self.image_size_by_path = {
+            path: info[0] for path, info in image_info_by_path.items()
+        }
+        self.image_has_transparency_by_path = {
+            path: info[1] for path, info in image_info_by_path.items()
+        }
         self.selected = {path for path in self.selected if path in {item.path for item in self.images}}
         self.apply_filter()
         self.update_prompt_preview(force=True)
+
+    def _read_image_info(self, path: Path) -> tuple[tuple[int, int] | None, bool | None]:
+        try:
+            return image_info(path)
+        except Exception:
+            return None, None
 
     def _read_image_size(self, path: Path) -> tuple[int, int] | None:
         try:
@@ -594,8 +607,15 @@ class ActionsMixin:
         if self.template_dirty:
             suffixes.append("템플릿 수정됨")
         suffix = f" | {' | '.join(suffixes)}" if suffixes else ""
+        transparency_by_path = getattr(self, "image_has_transparency_by_path", {})
+        transparent_count = sum(
+            1
+            for image in self.filtered_images
+            if transparency_by_path.get(image.path) is True
+        )
         self.status_var.set(
-            f"전체 {len(self.images)}개 | 표시 {len(self.filtered_images)}개 | 선택 {len(self.selected)}개{suffix}"
+            f"전체 {len(self.images)}개 | 표시 {len(self.filtered_images)}개 | "
+            f"투명 {transparent_count}개 | 선택 {len(self.selected)}개{suffix}"
         )
 
     def _scale_changed(self, _value: str) -> None:

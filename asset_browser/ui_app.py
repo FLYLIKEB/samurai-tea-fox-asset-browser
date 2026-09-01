@@ -7,9 +7,9 @@ import math
 from pathlib import Path
 import tkinter as tk
 
-from .constants import BG, BORDER, ERROR, MUTED, SELECTED, SELECTED_TEXT, TEXT
+from .constants import BG, BORDER, ERROR, MUTED, PANEL, SELECTED, SELECTED_TEXT, TEXT
 from .constants import GRID_CELL_PITCH
-from .image_ops import Image, ImageTk, recolor_image_to_palette
+from .image_ops import Image, ImageTk, composite_on_checkerboard, recolor_image_to_palette
 from .models import AssetImage
 from .prompting import load_prompt_template
 from .scanner import folder_group_label
@@ -32,6 +32,7 @@ class AssetCellWidgets:
     image_label: tk.Label
     name_label: tk.Label
     detail_label: tk.Label
+    transparency_label: tk.Label
     preview_error: bool
 
 class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
@@ -58,6 +59,7 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         self.image_by_path: dict[Path, AssetImage] = {}
         self.image_order_by_path: dict[Path, int] = {}
         self.image_size_by_path: dict[Path, tuple[int, int] | None] = {}
+        self.image_has_transparency_by_path: dict[Path, bool | None] = {}
         self.selected: set[Path] = set()
         self.cell_widgets: dict[Path, AssetCellWidgets] = {}
         self.path_by_widget_id: dict[int, Path] = {}
@@ -120,7 +122,7 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
             group_cell_width, _group_cell_height = cell_size_for_preview(group_preview_size)
             group_pitch = group_cell_width + 8
             columns = max(1, width // group_pitch)
-            self._add_group_header(label, len(images), row, columns, expanded)
+            self._add_group_header(label, images, row, columns, expanded)
             row += 1
             if not expanded:
                 continue
@@ -135,26 +137,44 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
     def _add_group_header(
         self,
         label: str,
-        count: int,
+        images: list[AssetImage],
         row: int,
         columns: int,
         expanded: bool,
     ) -> None:
-        header = tk.Frame(self.grid_frame, bg=BG, pady=2)
-        header.grid(row=row, column=0, columnspan=columns, sticky="w", padx=3, pady=(8, 1))
+        header = tk.Frame(
+            self.grid_frame,
+            bg=PANEL,
+            padx=8,
+            pady=5,
+            highlightthickness=1,
+            highlightbackground=BORDER,
+        )
+        header.grid(row=row, column=0, columnspan=columns, sticky="ew", padx=3, pady=(10, 2))
 
         icon = "▾" if expanded else "▸"
+        transparent_count = self.transparent_image_count(images)
         title = tk.Label(
             header,
-            text=f"{icon} {label}  {count}개",
-            bg=BG,
-            fg=MUTED,
+            text=f"{icon} {label}",
+            bg=PANEL,
+            fg=TEXT,
             anchor="w",
             font=("TkDefaultFont", 10, "bold"),
             cursor="pointinghand",
         )
         title.pack(side=tk.LEFT)
-        for widget in (header, title):
+        summary = tk.Label(
+            header,
+            text=f"{len(images)}개 | 투명 {transparent_count} | 불투명 {len(images) - transparent_count}",
+            bg=PANEL,
+            fg=MUTED,
+            anchor="e",
+            font=("TkDefaultFont", 9),
+            cursor="pointinghand",
+        )
+        summary.pack(side=tk.RIGHT)
+        for widget in (header, title, summary):
             widget.bind("<Button-1>", lambda _event, group_label=label: self.toggle_group(group_label))
 
     def current_group_labels(self) -> list[str]:
@@ -205,6 +225,10 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
             key=lambda size: size[0] * size[1],
         )
 
+    def transparent_image_count(self, images: list[AssetImage]) -> int:
+        transparency_by_path = getattr(self, "image_has_transparency_by_path", {})
+        return sum(1 for image in images if transparency_by_path.get(image.path) is True)
+
     def toggle_group(self, label: str) -> str:
         if label in self.expanded_group_labels:
             self.expanded_group_labels.remove(label)
@@ -225,9 +249,9 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         cell = tk.Frame(
             self.grid_frame,
             bg=bg,
-            padx=2,
-            pady=2,
-            highlightthickness=0,
+            padx=4,
+            pady=4,
+            highlightthickness=1,
             highlightbackground=SELECTED if is_selected else BORDER,
             width=cell_width,
             height=cell_height,
@@ -295,7 +319,20 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         )
         detail_label.pack(side=tk.BOTTOM)
 
-        for widget in (cell, image_box, image_label, name_label, detail_label):
+        badge_text, badge_bg, badge_fg = self._transparency_badge(item.path, is_selected)
+        transparency_label = tk.Label(
+            cell,
+            text=badge_text,
+            bg=badge_bg,
+            fg=badge_fg,
+            justify=tk.CENTER,
+            font=("TkDefaultFont", 8),
+            height=1,
+            padx=4,
+        )
+        transparency_label.pack(side=tk.BOTTOM, pady=(1, 0))
+
+        for widget in (cell, image_box, image_label, name_label, detail_label, transparency_label):
             widget.bind("<Button-1>", lambda _event, asset=item: self.schedule_toggle_selection(asset))
             widget.bind("<B1-Motion>", lambda _event, asset=item: self.begin_drag_selection(asset))
             widget.bind("<Enter>", lambda event, asset=item: self.extend_drag_selection(event, asset))
@@ -308,6 +345,7 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
             image_label=image_label,
             name_label=name_label,
             detail_label=detail_label,
+            transparency_label=transparency_label,
             preview_error=preview_error,
         )
 
@@ -323,6 +361,8 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         widgets.image_label.configure(bg=bg)
         widgets.name_label.configure(bg=bg, fg=fg)
         widgets.detail_label.configure(bg=bg, fg=meta_fg)
+        badge_text, badge_bg, badge_fg = self._transparency_badge(path, is_selected)
+        widgets.transparency_label.configure(text=badge_text, bg=badge_bg, fg=badge_fg)
 
         if widgets.preview_error:
             widgets.image_label.configure(fg=ERROR if not is_selected else SELECTED_TEXT)
@@ -357,19 +397,38 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         )
 
     def _cell_colors(self, is_selected: bool) -> tuple[str, str, str]:
-        bg = SELECTED if is_selected else BG
+        bg = SELECTED if is_selected else PANEL
         fg = SELECTED_TEXT if is_selected else TEXT
         meta_fg = SELECTED_TEXT if is_selected else MUTED
         return bg, fg, meta_fg
 
+    def _transparency_badge(self, path: Path, is_selected: bool) -> tuple[str, str, str]:
+        has_transparency = getattr(self, "image_has_transparency_by_path", {}).get(path)
+        if is_selected:
+            return self._transparency_label(has_transparency), SELECTED, SELECTED_TEXT
+        if has_transparency is True:
+            return "투명", "#e8f3f1", SELECTED
+        if has_transparency is False:
+            return "불투명", "#ececf0", MUTED
+        return "확인불가", "#f1f1f3", ERROR
+
+    def _transparency_label(self, has_transparency: bool | None) -> str:
+        if has_transparency is True:
+            return "투명"
+        if has_transparency is False:
+            return "불투명"
+        return "확인불가"
+
     def _load_thumbnail(self, path: Path) -> tuple[tk.PhotoImage | None, str]:
         scale = max(1, self.scale_var.get())
         known_size = self.image_size_by_path.get(path)
+        has_transparency = getattr(self, "image_has_transparency_by_path", {}).get(path)
+        transparency_meta = self._transparency_label(has_transparency)
         if known_size is not None and is_summary_size(*known_size):
             width, height = known_size
             tiles_wide = max(1, math.ceil(width / 32))
             tiles_high = max(1, math.ceil(height / 32))
-            return None, f"{width}x{height} | {tiles_wide}x{tiles_high}타일"
+            return None, f"{width}x{height} | {tiles_wide}x{tiles_high}타일 | {transparency_meta}"
 
         if Image is not None and ImageTk is not None:
             try:
@@ -390,7 +449,9 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
                     target_width, target_height = self._scaled_size(width, height, scale)
                     resampling = getattr(Image, "Resampling", Image)
                     image = image.resize((target_width, target_height), resampling.NEAREST)
-                    return ImageTk.PhotoImage(image), f"{width}x{height}{meta_suffix}"
+                    if has_transparency is True:
+                        image = composite_on_checkerboard(image)
+                    return ImageTk.PhotoImage(image), f"{width}x{height} | {transparency_meta}{meta_suffix}"
             except Exception as exc:  # Tk fallback may still work for PNG/GIF.
                 pil_error = exc
         else:
@@ -409,7 +470,7 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
             elif max(width, height) > 192:
                 subsample = math.ceil(max(width, height) / 192)
                 image = image.subsample(subsample, subsample)
-            return image, f"{width}x{height}"
+            return image, f"{width}x{height} | {transparency_meta}"
         except Exception as exc:
             if pil_error is not None:
                 return None, f"{path.suffix.lower()} 지원 안 됨"
