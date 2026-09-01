@@ -45,7 +45,7 @@ class AssetBrowserCoreTest(unittest.TestCase):
             [("sprites", ["fox.png"]), ("tiles", ["grass.png", "water.png"])],
         )
 
-    def test_current_group_labels_uses_filtered_images(self) -> None:
+    def test_current_group_labels_groups_by_folder_then_tile_size(self) -> None:
         browser = core.AssetBrowser.__new__(core.AssetBrowser)
         browser.project_root = Path("/project")
         browser.asset_root = browser.project_root / "assets"
@@ -59,8 +59,51 @@ class AssetBrowserCoreTest(unittest.TestCase):
         )
         browser.filtered_images = [fox, grass]
         browser.image_size_by_path = {fox.path: (32, 64), grass.path: (32, 32)}
+        browser.expanded_group_labels = set()
+        browser.default_expanded_group_labels = set()
 
-        self.assertEqual(browser.current_group_labels(), ["32x32 / tiles", "32x64 / sprites"])
+        self.assertEqual(browser.current_group_labels(), ["sprites / 32x64", "tiles / 32x32"])
+
+    def test_current_group_labels_opens_32x32_groups_by_default(self) -> None:
+        browser = core.AssetBrowser.__new__(core.AssetBrowser)
+        browser.project_root = Path("/project")
+        browser.asset_root = browser.project_root / "assets"
+        fox = core.AssetImage(
+            browser.project_root / "assets" / "sprites" / "fox.png",
+            Path("assets/sprites/fox.png"),
+        )
+        sheet = core.AssetImage(
+            browser.project_root / "assets" / "sprites" / "sheet.png",
+            Path("assets/sprites/sheet.png"),
+        )
+        browser.filtered_images = [fox, sheet]
+        browser.image_size_by_path = {fox.path: (32, 32), sheet.path: (64, 64)}
+        browser.expanded_group_labels = set()
+        browser.default_expanded_group_labels = set()
+
+        browser.current_group_labels()
+
+        self.assertIn("sprites / 32x32", browser.expanded_group_labels)
+        self.assertNotIn("sprites / 대형/시트 (64x64 이상)", browser.expanded_group_labels)
+
+    def test_default_opened_32x32_group_can_be_collapsed(self) -> None:
+        browser = core.AssetBrowser.__new__(core.AssetBrowser)
+        browser.project_root = Path("/project")
+        browser.asset_root = browser.project_root / "assets"
+        fox = core.AssetImage(
+            browser.project_root / "assets" / "sprites" / "fox.png",
+            Path("assets/sprites/fox.png"),
+        )
+        browser.filtered_images = [fox]
+        browser.image_size_by_path = {fox.path: (32, 32)}
+        browser.expanded_group_labels = set()
+        browser.default_expanded_group_labels = set()
+
+        browser.current_group_labels()
+        browser.expanded_group_labels.remove("sprites / 32x32")
+        browser.current_group_labels()
+
+        self.assertNotIn("sprites / 32x32", browser.expanded_group_labels)
 
     def test_thumbnail_scale_keeps_32px_assets_at_default_2x(self) -> None:
         scaled_size = core.AssetBrowser._scaled_size

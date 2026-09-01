@@ -77,6 +77,7 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         self.drag_selecting = False
         self.drag_seen_paths: set[Path] = set()
         self.expanded_group_labels: set[str] = set()
+        self.default_expanded_group_labels: set[str] = set()
 
         self.title("무사여우 에셋 브라우저")
         self.geometry("1360x940")
@@ -161,15 +162,40 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
 
     def grouped_images_for_render(self) -> list[tuple[str, list[AssetImage]]]:
         groups: dict[str, list[AssetImage]] = {}
-        sort_keys: dict[str, tuple[int, int, int, str]] = {}
+        sort_keys: dict[str, tuple[str, int, int, int]] = {}
         for image in self.filtered_images:
             size = self.image_size_by_path.get(image.path)
-            size_label = tile_size_group_label(size)
-            folder_label = folder_group_label(image, self.asset_root, self.project_root)
-            label = f"{size_label} / {folder_label}"
+            folder_label, size_label = self.group_parts_for_asset(image)
+            label = self.group_label_for_asset(image)
             groups.setdefault(label, []).append(image)
-            sort_keys.setdefault(label, (*tile_size_sort_key(size), folder_label.lower()))
+            sort_keys.setdefault(label, (folder_label.lower(), *tile_size_sort_key(size)))
+
+        self.expand_default_groups(groups)
         return sorted(groups.items(), key=lambda item: sort_keys[item[0]])
+
+    def group_parts_for_asset(self, image: AssetImage) -> tuple[str, str]:
+        size = self.image_size_by_path.get(image.path)
+        return (
+            folder_group_label(image, self.asset_root, self.project_root),
+            tile_size_group_label(size),
+        )
+
+    def group_label_for_asset(self, image: AssetImage) -> str:
+        folder_label, size_label = self.group_parts_for_asset(image)
+        return f"{folder_label} / {size_label}"
+
+    def expand_default_groups(self, groups: dict[str, list[AssetImage]]) -> None:
+        default_expanded = getattr(self, "default_expanded_group_labels", set())
+        self.default_expanded_group_labels = default_expanded
+        for label, images in groups.items():
+            if label in default_expanded:
+                continue
+            if any(
+                tile_size_group_label(self.image_size_by_path.get(image.path)) == "32x32"
+                for image in images
+            ):
+                self.expanded_group_labels.add(label)
+                default_expanded.add(label)
 
     def preview_size_for_group(self, images: list[AssetImage]) -> tuple[int, int]:
         if not images:
