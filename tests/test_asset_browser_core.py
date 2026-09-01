@@ -72,6 +72,14 @@ class AssetBrowserCoreTest(unittest.TestCase):
 
         self.assertEqual(browser.selected_assets(), [first, second])
 
+    def test_wheel_scroll_units_supports_mac_trackpad_small_delta(self) -> None:
+        self.assertEqual(core.wheel_scroll_units(-1, 0.0), (1, 0.0))
+        self.assertEqual(core.wheel_scroll_units(1, 0.0), (-1, 0.0))
+
+    def test_wheel_scroll_units_supports_classic_mousewheel_delta(self) -> None:
+        self.assertEqual(core.wheel_scroll_units(-120, 0.0), (1, 0.0))
+        self.assertEqual(core.wheel_scroll_units(120, 0.0), (-1, 0.0))
+
     def test_render_prompt_template_replaces_known_placeholders(self) -> None:
         prompt = core.render_prompt_template(
             "개수: {asset_count}\n루트: {project_root}\n이미지:\n{asset_list}",

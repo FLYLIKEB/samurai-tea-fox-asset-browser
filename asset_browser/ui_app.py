@@ -55,6 +55,7 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         self.updating_template = False
         self.pending_click_after_id: str | None = None
         self.suppress_single_click_until = 0.0
+        self.scroll_remainder = 0.0
 
         self.title("무사여우 에셋 브라우저")
         self.geometry("1360x940")

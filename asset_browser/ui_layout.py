@@ -17,6 +17,17 @@ from .constants import (
 )
 from .paths import template_path
 
+def wheel_scroll_units(delta: int, remainder: float) -> tuple[int, float]:
+    if delta == 0:
+        return 0, remainder
+
+    if abs(delta) < 120:
+        return (-1 if delta > 0 else 1), 0.0
+
+    amount = remainder + (-delta / 120)
+    units = int(amount)
+    return units, amount - units
+
 class LayoutMixin:
     def _build_ui(self) -> None:
         style = ttk.Style(self)
@@ -304,6 +315,8 @@ class LayoutMixin:
         self.grid_frame.bind("<Configure>", self._update_scroll_region)
         self.canvas.bind("<Configure>", self._resize_grid_window)
         self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+        self.canvas.bind_all("<Button-4>", self._on_mousewheel)
+        self.canvas.bind_all("<Button-5>", self._on_mousewheel)
 
     def _button(self, parent: tk.Widget, text: str, command) -> tk.Button:
         return tk.Button(
@@ -340,5 +353,15 @@ class LayoutMixin:
         self.canvas.itemconfigure(self.grid_window, width=event.width)
         self.render_grid()
 
-    def _on_mousewheel(self, event: tk.Event) -> None:
-        self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+    def _on_mousewheel(self, event: tk.Event) -> str:
+        event_num = getattr(event, "num", None)
+        if event_num == 4:
+            units = -1
+        elif event_num == 5:
+            units = 1
+        else:
+            units, self.scroll_remainder = wheel_scroll_units(int(event.delta), self.scroll_remainder)
+
+        if units:
+            self.canvas.yview_scroll(units, "units")
+        return "break"

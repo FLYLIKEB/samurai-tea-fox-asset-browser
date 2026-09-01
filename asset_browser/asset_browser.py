@@ -71,6 +71,7 @@ from asset_browser.style_tokens import (
     save_art_style_tokens,
 )
 from asset_browser.ui_app import AssetBrowser
+from asset_browser.ui_layout import wheel_scroll_units
 
 __all__ = [
     "ART_STYLE_TOKENS_PATH",
@@ -126,6 +127,7 @@ __all__ = [
     "save_prompt_template",
     "save_recolored_image",
     "template_path",
+    "wheel_scroll_units",
 ]
 
 if __name__ == "__main__":
