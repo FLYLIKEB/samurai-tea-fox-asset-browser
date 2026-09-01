@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import subprocess
+import time
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
@@ -52,6 +53,23 @@ class ActionsMixin:
         self.render_grid()
         self.update_prompt_preview()
 
+    def schedule_toggle_selection(self, asset: AssetImage) -> str:
+        if time.monotonic() < self.suppress_single_click_until:
+            return "break"
+
+        pending_id = self.pending_click_after_id
+        if pending_id is not None:
+            self.after_cancel(pending_id)
+
+        self.pending_click_after_id = self.after(220, lambda: self._run_scheduled_toggle(asset))
+        return "break"
+
+    def _run_scheduled_toggle(self, asset: AssetImage) -> None:
+        self.pending_click_after_id = None
+        if time.monotonic() < self.suppress_single_click_until:
+            return
+        self.toggle_selection(asset)
+
     def select_all(self) -> None:
         self.selected.update(item.path for item in self.filtered_images)
         self.render_grid()
@@ -98,18 +116,25 @@ class ActionsMixin:
         self.set_prompt_text(prompt, dirty=False)
         self._copy_text(prompt, "단일 이미지 프롬프트")
 
-    def open_crop_or_copy_prompt(self, asset: AssetImage) -> None:
+    def open_crop_or_copy_prompt(self, asset: AssetImage) -> str:
+        self.suppress_single_click_until = time.monotonic() + 0.35
+        pending_id = self.pending_click_after_id
+        if pending_id is not None:
+            self.after_cancel(pending_id)
+            self.pending_click_after_id = None
+
         try:
             should_crop = is_larger_than_tile(asset.path)
         except Exception as exc:
             messagebox.showerror("이미지 확인 실패", f"{asset.path}\n\n{exc}")
-            return
+            return "break"
 
         if not should_crop:
             self.copy_single_prompt(asset)
-            return
+            return "break"
 
         ImageCropWindow(self, asset, self._crop_saved)
+        return "break"
 
     def _crop_saved(self, path: Path) -> None:
         self.rescan()

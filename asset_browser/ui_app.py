@@ -39,6 +39,8 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         self.template_dirty = False
         self.updating_prompt = False
         self.updating_template = False
+        self.pending_click_after_id: str | None = None
+        self.suppress_single_click_until = 0.0
 
         self.title("무사여우 에셋 브라우저")
         self.geometry("1360x940")
@@ -170,7 +172,7 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         detail_label.pack(side=tk.BOTTOM)
 
         for widget in (cell, image_box, image_label, name_label, detail_label):
-            widget.bind("<Button-1>", lambda _event, asset=item: self.toggle_selection(asset))
+            widget.bind("<Button-1>", lambda _event, asset=item: self.schedule_toggle_selection(asset))
             widget.bind("<Double-Button-1>", lambda _event, asset=item: self.open_crop_or_copy_prompt(asset))
 
     def _load_thumbnail(self, path: Path) -> tuple[tk.PhotoImage | None, str]:
