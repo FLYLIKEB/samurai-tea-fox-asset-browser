@@ -85,12 +85,11 @@ def default_crop_output_path(source: Path, box: tuple[int, int, int, int]) -> Pa
     x1, y1, x2, y2 = box
     width = x2 - x1
     height = y2 - y1
-    suffix = source.suffix if source.suffix.lower() in {".png", ".jpg", ".jpeg"} else ".png"
-    candidate = source.with_name(f"{source.stem}_crop_{x1}_{y1}_{width}x{height}{suffix}")
+    candidate = source.with_name(f"{source.stem}_crop_{x1}_{y1}_{width}x{height}.png")
     index = 2
     while candidate.exists():
         candidate = source.with_name(
-            f"{source.stem}_crop_{x1}_{y1}_{width}x{height}_{index}{suffix}"
+            f"{source.stem}_crop_{x1}_{y1}_{width}x{height}_{index}.png"
         )
         index += 1
     return candidate

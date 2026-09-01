@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import messagebox
 
 from .constants import BG, BORDER, MUTED, PANEL, SELECTED, TEXT
 from .image_ops import (
@@ -37,6 +37,7 @@ class ImageCropWindow(tk.Toplevel):
         self.box: tuple[int, int, int, int] | None = None
         self.preview_ref: tk.PhotoImage | None = None
         self.rect_id: int | None = None
+        self.last_saved_path: Path | None = None
 
         self.title(f"이미지 크롭 - {asset.relative_path.name}")
         self.geometry("1080x760")
@@ -157,7 +158,16 @@ class ImageCropWindow(tk.Toplevel):
             self.rect_id = self.canvas.create_rectangle(*display_box, outline=SELECTED, width=2)
         else:
             self.canvas.coords(self.rect_id, *display_box)
-        self.info_var.set(f"선택 영역: x={x1}, y={y1}, w={x2 - x1}, h={y2 - y1}")
+        self._show_box_status()
+
+    def _show_box_status(self) -> None:
+        if self.box is None:
+            return
+        x1, y1, x2, y2 = self.box
+        status = f"선택 영역: x={x1}, y={y1}, w={x2 - x1}, h={y2 - y1}"
+        if self.last_saved_path is not None:
+            status = f"{status} | 마지막 저장: {self.last_saved_path.name}"
+        self.info_var.set(status)
 
     def fit_32(self) -> None:
         if self.box is None:
@@ -172,22 +182,14 @@ class ImageCropWindow(tk.Toplevel):
             messagebox.showinfo("선택 없음", "크롭할 영역을 먼저 선택하세요.")
             return
 
-        default_path = default_crop_output_path(self.asset.path, self.box)
-        target = filedialog.asksaveasfilename(
-            initialdir=str(default_path.parent),
-            initialfile=default_path.name,
-            defaultextension=".png",
-            filetypes=[("PNG 이미지", "*.png"), ("JPEG 이미지", "*.jpg"), ("모든 파일", "*.*")],
-        )
-        if not target:
-            return
+        target = default_crop_output_path(self.asset.path, self.box)
 
         try:
-            crop_image_to_file(self.asset.path, Path(target), self.box)
+            crop_image_to_file(self.asset.path, target, self.box)
         except Exception as exc:
             messagebox.showerror("크롭 저장 실패", str(exc))
             return
 
-        self.on_saved(Path(target))
-        messagebox.showinfo("크롭 저장 완료", str(target))
-        self.destroy()
+        self.last_saved_path = target
+        self.on_saved(target)
+        self._show_box_status()

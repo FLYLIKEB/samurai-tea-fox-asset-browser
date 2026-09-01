@@ -104,6 +104,16 @@ class AssetBrowserCoreTest(unittest.TestCase):
 
         self.assertEqual(target.name, "sheet_crop_32_64_32x32.png")
 
+    def test_default_crop_output_path_always_uses_png_and_avoids_collisions(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "sheet.jpg"
+            existing = Path(tmp) / "sheet_crop_0_0_32x32.png"
+            existing.write_bytes(b"already here")
+
+            target = core.default_crop_output_path(source, (0, 0, 32, 32))
+
+        self.assertEqual(target.name, "sheet_crop_0_0_32x32_2.png")
+
     @unittest.skipIf(core.Image is None, "Pillow is not installed")
     def test_crop_image_to_file_saves_original_pixel_region(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
