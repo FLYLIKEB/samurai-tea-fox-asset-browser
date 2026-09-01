@@ -43,7 +43,13 @@ class LayoutMixin:
         self._button(toolbar, "⌕ 찾기 (⌘O)", self.choose_root).grid(row=0, column=1, padx=1)
         self._button(toolbar, "↻ 새로고침 (⌘R)", self.rescan).grid(row=0, column=2, padx=1)
         self._button(toolbar, "⌂ Finder (⌘F)", self.reveal_asset_root).grid(
-            row=0, column=3, padx=(1, 8)
+            row=0, column=3, padx=1
+        )
+        self._button(toolbar, "▾ 펼침 (⌘U)", self.expand_all_groups).grid(
+            row=0, column=4, padx=1
+        )
+        self._button(toolbar, "▸ 접기 (⌘J)", self.collapse_all_groups).grid(
+            row=0, column=5, padx=(1, 8)
         )
         filter_entry = tk.Entry(
             toolbar,
@@ -53,16 +59,16 @@ class LayoutMixin:
             relief=tk.FLAT,
             insertbackground=TEXT,
         )
-        filter_entry.grid(row=0, column=4, sticky="ew", padx=(0, 6))
+        filter_entry.grid(row=0, column=6, sticky="ew", padx=(0, 6))
         filter_entry.bind("<KeyRelease>", lambda _event: self.apply_filter())
 
         scale_box = tk.OptionMenu(toolbar, self.scale_var, *SCALE_CHOICES, command=self._scale_changed)
         scale_box.configure(bg=BG, fg=TEXT, activebackground=PANEL, relief=tk.FLAT, width=6)
         scale_box["menu"].configure(bg=BG, fg=TEXT)
-        scale_box.grid(row=0, column=5, padx=(0, 2))
+        scale_box.grid(row=0, column=7, padx=(0, 2))
 
         toolbar.columnconfigure(0, weight=3)
-        toolbar.columnconfigure(4, weight=2)
+        toolbar.columnconfigure(6, weight=2)
 
         actions = tk.Frame(self, bg=BG, padx=8, pady=6)
         actions.pack(side=tk.TOP, fill=tk.X)
@@ -408,6 +414,8 @@ class LayoutMixin:
         self._shortcut("<Command-o>", self.choose_root)
         self._shortcut("<Command-r>", self.rescan)
         self._shortcut("<Command-f>", self.reveal_asset_root)
+        self._shortcut("<Command-u>", self.expand_all_groups)
+        self._shortcut("<Command-j>", self.collapse_all_groups)
         self._shortcut("<Command-a>", self.select_all)
         self._shortcut("<Escape>", self.clear_selection)
         self._shortcut("<Delete>", self.delete_selected_images)

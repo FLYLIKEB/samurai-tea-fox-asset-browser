@@ -127,6 +127,16 @@ class ActionsMixin:
         else:
             self._set_status()
 
+    def expand_all_groups(self) -> None:
+        self.expanded_group_labels.update(self.current_group_labels())
+        self.render_grid()
+        self.status_var.set("모든 폴더를 펼쳤습니다.")
+
+    def collapse_all_groups(self) -> None:
+        self.expanded_group_labels.clear()
+        self.render_grid()
+        self.status_var.set("모든 폴더를 접었습니다.")
+
     def schedule_toggle_selection(self, asset: AssetImage) -> str:
         if time.monotonic() < self.suppress_single_click_until:
             return "break"

@@ -141,6 +141,16 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         for widget in (header, title):
             widget.bind("<Button-1>", lambda _event, group_label=label: self.toggle_group(group_label))
 
+    def current_group_labels(self) -> list[str]:
+        return [
+            label
+            for label, _images in group_images_by_folder(
+                self.filtered_images,
+                self.asset_root,
+                self.project_root,
+            )
+        ]
+
     def toggle_group(self, label: str) -> str:
         if label in self.expanded_group_labels:
             self.expanded_group_labels.remove(label)

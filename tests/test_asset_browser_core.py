@@ -40,6 +40,17 @@ class AssetBrowserCoreTest(unittest.TestCase):
             [("sprites", ["fox.png"]), ("tiles", ["grass.png", "water.png"])],
         )
 
+    def test_current_group_labels_uses_filtered_images(self) -> None:
+        browser = core.AssetBrowser.__new__(core.AssetBrowser)
+        browser.project_root = Path("/project")
+        browser.asset_root = browser.project_root / "assets"
+        browser.filtered_images = [
+            core.AssetImage(browser.project_root / "assets" / "sprites" / "fox.png", Path("assets/sprites/fox.png")),
+            core.AssetImage(browser.project_root / "assets" / "tiles" / "grass.png", Path("assets/tiles/grass.png")),
+        ]
+
+        self.assertEqual(browser.current_group_labels(), ["sprites", "tiles"])
+
     def test_thumbnail_scale_keeps_32px_assets_at_4x_inside_128px_box(self) -> None:
         scaled_size = core.AssetBrowser._scaled_size
 

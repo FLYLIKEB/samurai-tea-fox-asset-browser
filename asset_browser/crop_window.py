@@ -15,6 +15,7 @@ from .image_ops import (
     crop_image_to_file,
     default_crop_output_path,
     flood_fill_image,
+    make_color_transparent,
     normalize_crop_box,
     save_rgba_image_to_file,
 )
@@ -50,8 +51,8 @@ class ImageCropWindow(tk.Toplevel):
         self.tool_mode = tk.StringVar(value="crop")
         self.paint_color_var = tk.StringVar(value="#2F6F73")
         self.paint_tolerance_var = tk.IntVar(value=0)
-        self.paint_dirty = False
-        self.last_painted_pixels = 0
+        self.edit_dirty = False
+        self.last_changed_pixels = 0
         self.project_root = getattr(parent, "project_root", asset.path.parent)
         self.palette_colors = extract_palette_colors(getattr(parent, "art_style_data", None))
 
@@ -132,7 +133,10 @@ class ImageCropWindow(tk.Toplevel):
             relief=tk.FLAT,
             increment=4,
         ).pack(side=tk.LEFT, padx=(0, 5))
-        self._button(secondary_actions, "⬇ 페인트 저장 (⌘P)", self.save_painted_image, width=16).pack(
+        self._button(secondary_actions, "◫ 투명화 (T)", self.apply_transparency, width=12).pack(
+            side=tk.LEFT, padx=(0, 5)
+        )
+        self._button(secondary_actions, "⬇ 편집 저장 (⌘P)", self.save_edited_image, width=15).pack(
             side=tk.LEFT, padx=(0, 5)
         )
         self._button(secondary_actions, "× 초기화 (C)", self.clear_queued_boxes, width=10).pack(
@@ -166,14 +170,15 @@ class ImageCropWindow(tk.Toplevel):
         self.bind("v", lambda _event: self.use_crop_tool())
         self.bind("p", lambda _event: self.use_paint_tool())
         self.bind("i", lambda _event: self.use_eyedropper_tool())
+        self.bind("t", lambda _event: self.apply_transparency())
         self.bind("x", lambda _event: self.fit_32())
         self.bind("c", lambda _event: self.clear_queued_boxes())
         self.bind("<Command-s>", lambda _event: self.save_shortcut())
         self.bind("<Command-Shift-s>", lambda _event: self.save_all_crops())
-        self.bind("<Command-p>", lambda _event: self.save_painted_image())
+        self.bind("<Command-p>", lambda _event: self.save_edited_image())
         self.bind("<Control-s>", lambda _event: self.save_shortcut())
         self.bind("<Control-Shift-s>", lambda _event: self.save_all_crops())
-        self.bind("<Control-p>", lambda _event: self.save_painted_image())
+        self.bind("<Control-p>", lambda _event: self.save_edited_image())
 
     def _add_palette_chips(self, parent: tk.Widget) -> None:
         for rgb in self.palette_colors[:8]:
@@ -288,10 +293,10 @@ class ImageCropWindow(tk.Toplevel):
             status = f"{status} | 대기 {len(self.queued_boxes)}개"
         if self.last_saved_path is not None:
             status = f"{status} | 마지막 저장: {self.last_saved_path.name}"
-        if self.paint_dirty:
-            status = f"{status} | 페인트 미저장"
-        if self.last_painted_pixels:
-            status = f"{status} | 페인트 {self.last_painted_pixels}픽셀"
+        if self.edit_dirty:
+            status = f"{status} | 편집 미저장"
+        if self.last_changed_pixels:
+            status = f"{status} | 변경 {self.last_changed_pixels}픽셀"
         status = f"{status} | 도구: {self._tool_mode_label()} | 색: {self.paint_color_var.get()}"
         self.info_var.set(status)
 
@@ -356,15 +361,37 @@ class ImageCropWindow(tk.Toplevel):
             rgb,
             self.paint_tolerance_var.get(),
         )
-        self.last_painted_pixels = changed
+        self.last_changed_pixels = changed
         if changed:
-            self.paint_dirty = True
+            self.edit_dirty = True
             self._render_image()
         self._show_box_status()
         return "break"
 
-    def save_painted_image(self) -> str:
-        if not self.paint_dirty:
+    def apply_transparency(self) -> str:
+        rgb = hex_to_rgb(self.paint_color_var.get())
+        if rgb is None:
+            messagebox.showerror("색상 오류", f"잘못된 색상입니다: {self.paint_color_var.get()}")
+            return "break"
+
+        before = list(self.original.getdata())
+        self.original = make_color_transparent(
+            self.original,
+            rgb,
+            self.paint_tolerance_var.get(),
+        )
+        changed = sum(
+            1 for old, new in zip(before, self.original.getdata(), strict=True) if old != new
+        )
+        self.last_changed_pixels = changed
+        if changed:
+            self.edit_dirty = True
+            self._render_image()
+        self._show_box_status()
+        return "break"
+
+    def save_edited_image(self) -> str:
+        if not self.edit_dirty:
             self._show_box_status()
             return "break"
 
@@ -375,10 +402,10 @@ class ImageCropWindow(tk.Toplevel):
             shutil.copy2(self.asset.path, backup_path)
             save_rgba_image_to_file(self.original, self.asset.path)
         except Exception as exc:
-            messagebox.showerror("페인트 저장 실패", str(exc))
+            messagebox.showerror("편집 저장 실패", str(exc))
             return "break"
 
-        self.paint_dirty = False
+        self.edit_dirty = False
         self.last_saved_path = self.asset.path
         self.on_saved(self.asset.path)
         self._show_box_status()
