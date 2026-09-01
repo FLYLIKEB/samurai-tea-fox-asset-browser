@@ -165,6 +165,61 @@ def make_color_transparent(image, rgb: tuple[int, int, int], tolerance: int = 0)
     converted.putdata(transparent)
     return converted
 
+def flood_fill_image(
+    image,
+    point: tuple[int, int],
+    rgb: tuple[int, int, int],
+    tolerance: int = 0,
+):
+    image = image.convert("RGBA")
+    width, height = image.size
+    x, y = point
+    if x < 0 or y < 0 or x >= width or y >= height:
+        return image, 0
+
+    pixels = image.load()
+    target = pixels[x, y]
+    replacement = (rgb[0], rgb[1], rgb[2], 255)
+    tolerance = max(0, min(255, tolerance))
+    if target == replacement:
+        return image, 0
+
+    def matches(pixel) -> bool:
+        if target[3] == 0:
+            return pixel[3] == 0
+        return pixel[3] > 0 and color_within_tolerance(pixel[:3], target[:3], tolerance)
+
+    changed = 0
+    stack = [(x, y)]
+    visited: set[tuple[int, int]] = set()
+    while stack:
+        current_x, current_y = stack.pop()
+        if (current_x, current_y) in visited:
+            continue
+        visited.add((current_x, current_y))
+        if current_x < 0 or current_y < 0 or current_x >= width or current_y >= height:
+            continue
+        if not matches(pixels[current_x, current_y]):
+            continue
+        pixels[current_x, current_y] = replacement
+        changed += 1
+        stack.extend(
+            (
+                (current_x + 1, current_y),
+                (current_x - 1, current_y),
+                (current_x, current_y + 1),
+                (current_x, current_y - 1),
+            )
+        )
+
+    return image, changed
+
+def save_rgba_image_to_file(image, path: Path) -> None:
+    target = image.convert("RGBA")
+    if path.suffix.lower() in {".jpg", ".jpeg"}:
+        target = target.convert("RGB")
+    target.save(path)
+
 def save_color_transparent_image(path: Path, rgb: tuple[int, int, int], tolerance: int = 0) -> None:
     if Image is None:
         raise RuntimeError("배경 투명화에는 Pillow가 필요합니다.")

@@ -270,6 +270,26 @@ class AssetBrowserCoreTest(unittest.TestCase):
         self.assertFalse(core.color_within_tolerance((244, 248, 245), (255, 255, 255), 10))
 
     @unittest.skipIf(core.Image is None, "Pillow is not installed")
+    def test_flood_fill_image_recolors_connected_region_only(self) -> None:
+        image = core.Image.new("RGBA", (3, 2))
+        image.putdata(
+            [
+                (1, 1, 1, 255),
+                (1, 1, 1, 255),
+                (9, 9, 9, 255),
+                (1, 1, 1, 255),
+                (9, 9, 9, 255),
+                (9, 9, 9, 255),
+            ]
+        )
+
+        painted, changed = core.flood_fill_image(image, (0, 0), (255, 0, 0))
+
+        self.assertEqual(changed, 3)
+        self.assertEqual(painted.getpixel((0, 0)), (255, 0, 0, 255))
+        self.assertEqual(painted.getpixel((1, 1)), (9, 9, 9, 255))
+
+    @unittest.skipIf(core.Image is None, "Pillow is not installed")
     def test_make_color_transparent_supports_tolerance(self) -> None:
         image = core.Image.new("RGBA", (2, 1))
         image.putdata([(250, 248, 245, 255), (230, 248, 245, 255)])

@@ -24,6 +24,12 @@ def palette_backup_root(project_root: Path | None = None) -> Path:
         return Path.cwd().resolve() / "tools" / "asset_browser" / "palette_backups" / stamp
     return project_root / "tools" / "asset_browser" / "palette_backups" / stamp
 
+def paint_backup_root(project_root: Path | None = None) -> Path:
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    if project_root is None:
+        return Path.cwd().resolve() / "tools" / "asset_browser" / "paint_backups" / stamp
+    return project_root / "tools" / "asset_browser" / "paint_backups" / stamp
+
 def relative_or_name(path: Path, project_root: Path) -> Path:
     try:
         return path.relative_to(project_root)

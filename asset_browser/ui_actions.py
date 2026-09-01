@@ -16,7 +16,6 @@ from .image_ops import (
     apply_palette_to_images,
     apply_transparency_to_images,
     default_resize_output_path,
-    is_larger_than_tile,
     parse_image_size,
     resize_image_to_file,
 )
@@ -272,16 +271,6 @@ class ActionsMixin:
         if pending_id is not None:
             self.after_cancel(pending_id)
             self.pending_click_after_id = None
-
-        try:
-            should_crop = is_larger_than_tile(asset.path)
-        except Exception as exc:
-            messagebox.showerror("이미지 확인 실패", f"{asset.path}\n\n{exc}")
-            return "break"
-
-        if not should_crop:
-            self.copy_single_prompt(asset)
-            return "break"
 
         ImageCropWindow(self, asset, self._crop_saved)
         return "break"
