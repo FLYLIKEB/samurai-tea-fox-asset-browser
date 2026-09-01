@@ -534,10 +534,13 @@ class ActionsMixin:
             return
 
         tolerance = self.transparent_tolerance_var.get()
+        edge_only = self.transparent_edge_only_var.get()
         backup_root = palette_backup_root(self.project_root)
+        mode = "외곽 연결 영역만" if edge_only else "같은 색 전체"
         ok = messagebox.askokcancel(
             "배경 투명화 확인",
             f"선택한 이미지 {len(assets)}개에서 {color} 주변 색상을 투명으로 실제 변경합니다.\n"
+            f"방식: {mode}\n"
             f"허용 범위: 채널별 ±{tolerance}\n\n"
             f"백업 위치: {backup_root}\n\n계속할까요?",
         )
@@ -550,13 +553,14 @@ class ActionsMixin:
             self.project_root,
             backup_root,
             tolerance,
+            edge_only,
         )
         self.rescan()
         if failures:
             self._copy_text("\n".join(failures) + "\n", "투명화 실패 목록")
             messagebox.showwarning("일부 투명화 실패", f"{converted}개 변환, {len(failures)}개 실패")
         self.status_var.set(
-            f"배경 투명화 완료: {converted}개 | 색상 {color} | 범위 {tolerance} | 백업: {backup_root}"
+            f"배경 투명화 완료: {converted}개 | {mode} | 색상 {color} | 범위 {tolerance} | 백업: {backup_root}"
         )
 
     def _copy_lines(self, lines: list[str], label: str) -> None:

@@ -392,5 +392,18 @@ class AssetBrowserCoreTest(unittest.TestCase):
             [(250, 248, 245, 0), (230, 248, 245, 255)],
         )
 
+    @unittest.skipIf(core.Image is None, "Pillow is not installed")
+    def test_edge_connected_transparency_preserves_enclosed_matching_color(self) -> None:
+        image = core.Image.new("RGBA", (5, 5), (255, 255, 255, 255))
+        for x in range(1, 4):
+            for y in range(1, 4):
+                image.putpixel((x, y), (1, 1, 1, 255))
+        image.putpixel((2, 2), (255, 255, 255, 255))
+
+        converted = core.make_edge_connected_color_transparent(image, (255, 255, 255))
+
+        self.assertEqual(converted.getpixel((0, 0)), (255, 255, 255, 0))
+        self.assertEqual(converted.getpixel((2, 2)), (255, 255, 255, 255))
+
 if __name__ == "__main__":
     unittest.main()

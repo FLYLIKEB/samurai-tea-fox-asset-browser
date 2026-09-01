@@ -202,6 +202,59 @@ def make_color_transparent(image, rgb: tuple[int, int, int], tolerance: int = 0)
     converted.putdata(transparent)
     return converted
 
+
+def make_edge_connected_color_transparent(
+    image,
+    rgb: tuple[int, int, int],
+    tolerance: int = 0,
+):
+    image = image.convert("RGBA")
+    width, height = image.size
+    if width <= 0 or height <= 0:
+        return image
+
+    pixels = image.load()
+    tolerance = max(0, min(255, tolerance))
+
+    def matches(x: int, y: int) -> bool:
+        red, green, blue, alpha = pixels[x, y]
+        return alpha > 0 and color_within_tolerance((red, green, blue), rgb, tolerance)
+
+    stack: list[tuple[int, int]] = []
+    for x in range(width):
+        if matches(x, 0):
+            stack.append((x, 0))
+        if height > 1 and matches(x, height - 1):
+            stack.append((x, height - 1))
+    for y in range(1, height - 1):
+        if matches(0, y):
+            stack.append((0, y))
+        if width > 1 and matches(width - 1, y):
+            stack.append((width - 1, y))
+
+    visited: set[tuple[int, int]] = set()
+    while stack:
+        current_x, current_y = stack.pop()
+        if (current_x, current_y) in visited:
+            continue
+        visited.add((current_x, current_y))
+        if current_x < 0 or current_y < 0 or current_x >= width or current_y >= height:
+            continue
+        if not matches(current_x, current_y):
+            continue
+        red, green, blue, _alpha = pixels[current_x, current_y]
+        pixels[current_x, current_y] = (red, green, blue, 0)
+        stack.extend(
+            (
+                (current_x + 1, current_y),
+                (current_x - 1, current_y),
+                (current_x, current_y + 1),
+                (current_x, current_y - 1),
+            )
+        )
+
+    return image
+
 def flood_fill_image(
     image,
     point: tuple[int, int],
@@ -265,12 +318,26 @@ def save_color_transparent_image(path: Path, rgb: tuple[int, int, int], toleranc
         converted = make_color_transparent(opened, rgb, tolerance)
         converted.save(path)
 
+
+def save_edge_connected_color_transparent_image(
+    path: Path,
+    rgb: tuple[int, int, int],
+    tolerance: int = 0,
+) -> None:
+    if Image is None:
+        raise RuntimeError("배경 투명화에는 Pillow가 필요합니다.")
+
+    with Image.open(path) as opened:
+        converted = make_edge_connected_color_transparent(opened, rgb, tolerance)
+        converted.save(path)
+
 def apply_transparency_to_images(
     image_paths: list[Path],
     rgb: tuple[int, int, int],
     project_root: Path,
     backup_root: Path,
     tolerance: int = 0,
+    edge_only: bool = False,
 ) -> tuple[int, list[str]]:
     converted = 0
     failures: list[str] = []
@@ -280,7 +347,10 @@ def apply_transparency_to_images(
             backup_path = backup_root / relative_or_name(path, project_root)
             backup_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(path, backup_path)
-            save_color_transparent_image(path, rgb, tolerance)
+            if edge_only:
+                save_edge_connected_color_transparent_image(path, rgb, tolerance)
+            else:
+                save_color_transparent_image(path, rgb, tolerance)
             converted += 1
         except Exception as exc:
             failures.append(f"{path}: {exc}")

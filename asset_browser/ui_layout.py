@@ -165,6 +165,19 @@ class LayoutMixin:
             increment=4,
         )
         tolerance_box.pack(side=tk.LEFT, padx=(0, 3))
+        edge_only_toggle = tk.Checkbutton(
+            image_row,
+            text="외곽만",
+            variable=self.transparent_edge_only_var,
+            bg=BG,
+            fg=TEXT,
+            activebackground=BG,
+            activeforeground=TEXT,
+            selectcolor=PANEL,
+            relief=tk.FLAT,
+            padx=4,
+        )
+        edge_only_toggle.pack(side=tk.LEFT, padx=(0, 3))
         self._button(
             image_row,
             "◫ 투명화 (⌘G)",

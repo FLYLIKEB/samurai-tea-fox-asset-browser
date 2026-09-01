@@ -15,7 +15,7 @@ from .image_ops import (
     crop_image_to_file,
     default_crop_output_path,
     flood_fill_image,
-    make_color_transparent,
+    make_edge_connected_color_transparent,
     normalize_crop_box,
     save_rgba_image_to_file,
 )
@@ -137,7 +137,7 @@ class ImageCropWindow(tk.Toplevel):
             relief=tk.FLAT,
             increment=4,
         ).pack(side=tk.LEFT, padx=(0, 5))
-        self._button(secondary_actions, "◫ 투명화 (T)", self.apply_transparency, width=12).pack(
+        self._button(secondary_actions, "◫ 외곽 투명화 (T)", self.apply_transparency, width=15).pack(
             side=tk.LEFT, padx=(0, 5)
         )
         self._button(secondary_actions, "⬇ 편집 저장 (⌘P)", self.save_edited_image, width=15).pack(
@@ -379,7 +379,7 @@ class ImageCropWindow(tk.Toplevel):
             return "break"
 
         before = list(self.original.getdata())
-        self.original = make_color_transparent(
+        self.original = make_edge_connected_color_transparent(
             self.original,
             rgb,
             self.paint_tolerance_var.get(),

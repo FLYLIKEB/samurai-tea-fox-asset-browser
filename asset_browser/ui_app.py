@@ -45,6 +45,7 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         self.adjustment_percent_var = tk.IntVar(value=20)
         self.transparent_color_var = tk.StringVar(value="#ffffff")
         self.transparent_tolerance_var = tk.IntVar(value=32)
+        self.transparent_edge_only_var = tk.BooleanVar(value=True)
         self.palette_preview_var = tk.BooleanVar(value=False)
         self.palette_candidate_var = tk.StringVar(value="정본")
         self.scroll_select_var = tk.BooleanVar(value=False)
