@@ -69,7 +69,8 @@ class LayoutMixin:
 
         self._button(actions, "✓ 전체 (⌘A)", self.select_all).pack(side=tk.LEFT, padx=(0, 4))
         self._button(actions, "× 해제 (Esc)", self.clear_selection).pack(side=tk.LEFT, padx=(0, 4))
-        self._button(actions, "⌫ 삭제 (Del)", self.delete_selected_images).pack(side=tk.LEFT, padx=(0, 8))
+        self._button(actions, "⌫ 삭제 (Del)", self.delete_selected_images).pack(side=tk.LEFT, padx=(0, 4))
+        self._button(actions, "⇢ 이동 (⌘M)", self.move_selected_images).pack(side=tk.LEFT, padx=(0, 8))
         self._button(actions, "⇄ 상대 (⌘1)", self.copy_relative_paths).pack(side=tk.LEFT, padx=(0, 4))
         self._button(actions, "⛓ 절대 (⌘2)", self.copy_absolute_paths).pack(side=tk.LEFT, padx=(0, 4))
         self._button(actions, "⌘ 프롬프트 (⌘C)", self.copy_codex_prompt).pack(
@@ -141,6 +142,20 @@ class LayoutMixin:
             padx=6,
         )
         preview_toggle.pack(side=tk.RIGHT)
+        scroll_select_toggle = tk.Checkbutton(
+            actions,
+            text="↕ 스크롤선택 (⌘E)",
+            variable=self.scroll_select_var,
+            command=self.scroll_select_changed,
+            bg=BG,
+            fg=TEXT,
+            activebackground=BG,
+            activeforeground=TEXT,
+            selectcolor=PANEL,
+            relief=tk.FLAT,
+            padx=6,
+        )
+        scroll_select_toggle.pack(side=tk.RIGHT, padx=(0, 8))
 
         self.bottom_panel = tk.Frame(self, bg=PANEL, padx=8, pady=3)
         self.bottom_panel.pack(side=tk.BOTTOM, fill=tk.X)
@@ -370,6 +385,7 @@ class LayoutMixin:
         self._shortcut("<Escape>", self.clear_selection)
         self._shortcut("<Delete>", self.delete_selected_images)
         self._shortcut("<BackSpace>", self.delete_selected_images)
+        self._shortcut("<Command-m>", self.move_selected_images)
         self._shortcut("<Command-Key-1>", self.copy_relative_paths)
         self._shortcut("<Command-Key-2>", self.copy_absolute_paths)
         self._shortcut("<Command-c>", self.copy_codex_prompt)
@@ -379,6 +395,7 @@ class LayoutMixin:
         self._shortcut("<Command-k>", self.choose_transparent_color)
         self._shortcut("<Command-p>", self.apply_palette_to_shown_images)
         self._shortcut("<Command-v>", self.toggle_palette_preview)
+        self._shortcut("<Command-e>", self.toggle_scroll_select)
         self._shortcut("<Command-w>", self.toggle_bottom_panel)
         self._shortcut("<Command-i>", self.reset_prompt)
         self._shortcut("<Command-b>", self.restore_builtin_template)
@@ -423,8 +440,8 @@ class LayoutMixin:
 
         if units:
             self.canvas.yview_scroll(units, "units")
-            if self.drag_selecting or getattr(event, "state", 0) & 0x0001:
-                self.after_idle(self.select_asset_under_pointer)
+            if self.drag_selecting or self.scroll_select_var.get() or getattr(event, "state", 0) & 0x0001:
+                self.after_idle(self.select_visible_images)
         return "break"
 
     def autoscroll_during_drag(self, event: tk.Event) -> None:

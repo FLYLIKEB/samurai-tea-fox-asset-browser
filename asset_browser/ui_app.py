@@ -36,6 +36,7 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         self.transparent_color_var = tk.StringVar(value="#ffffff")
         self.transparent_tolerance_var = tk.IntVar(value=32)
         self.palette_preview_var = tk.BooleanVar(value=False)
+        self.scroll_select_var = tk.BooleanVar(value=False)
         self.bottom_panel_visible = tk.BooleanVar(value=False)
         self.filter_var = tk.StringVar()
         self.status_var = tk.StringVar()
@@ -61,6 +62,7 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         self.scroll_remainder = 0.0
         self.drag_selecting = False
         self.drag_seen_paths: set[Path] = set()
+        self.expanded_group_labels: set[str] = set()
 
         self.title("무사여우 에셋 브라우저")
         self.geometry("1360x940")
@@ -101,8 +103,11 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
             self.asset_root,
             self.project_root,
         ):
-            self._add_group_header(label, len(images), row, columns)
+            expanded = label in self.expanded_group_labels
+            self._add_group_header(label, len(images), row, columns, expanded)
             row += 1
+            if not expanded:
+                continue
             for index, item in enumerate(images):
                 cell_row = row + index // columns
                 column = index % columns
@@ -111,19 +116,38 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
 
         self._set_status()
 
-    def _add_group_header(self, label: str, count: int, row: int, columns: int) -> None:
+    def _add_group_header(
+        self,
+        label: str,
+        count: int,
+        row: int,
+        columns: int,
+        expanded: bool,
+    ) -> None:
         header = tk.Frame(self.grid_frame, bg=BG, pady=2)
         header.grid(row=row, column=0, columnspan=columns, sticky="w", padx=3, pady=(8, 1))
 
+        icon = "▾" if expanded else "▸"
         title = tk.Label(
             header,
-            text=f"{label}  {count}개",
+            text=f"{icon} {label}  {count}개",
             bg=BG,
             fg=MUTED,
             anchor="w",
             font=("TkDefaultFont", 10, "bold"),
+            cursor="pointinghand",
         )
         title.pack(side=tk.LEFT)
+        for widget in (header, title):
+            widget.bind("<Button-1>", lambda _event, group_label=label: self.toggle_group(group_label))
+
+    def toggle_group(self, label: str) -> str:
+        if label in self.expanded_group_labels:
+            self.expanded_group_labels.remove(label)
+        else:
+            self.expanded_group_labels.add(label)
+        self.render_grid()
+        return "break"
 
     def _add_cell(self, item: AssetImage, row: int, column: int) -> None:
         is_selected = item.path in self.selected
@@ -234,6 +258,22 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
                 return self.image_by_path.get(path)
             widget = widget.master
         return None
+
+    def visible_assets(self) -> list[AssetImage]:
+        top = self.canvas.canvasy(0)
+        bottom = self.canvas.canvasy(self.canvas.winfo_height())
+        assets: list[AssetImage] = []
+        for path, widgets in self.cell_widgets.items():
+            cell_top = widgets.cell.winfo_y()
+            cell_bottom = cell_top + widgets.cell.winfo_height()
+            if cell_bottom >= top and cell_top <= bottom:
+                asset = self.image_by_path.get(path)
+                if asset is not None:
+                    assets.append(asset)
+        return sorted(
+            assets,
+            key=lambda asset: self.image_order_by_path.get(asset.path, 0),
+        )
 
     def _cell_colors(self, is_selected: bool) -> tuple[str, str, str]:
         bg = SELECTED if is_selected else BG

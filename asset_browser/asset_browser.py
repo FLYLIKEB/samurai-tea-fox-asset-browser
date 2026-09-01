@@ -28,6 +28,7 @@ from asset_browser.constants import (
     SELECTED_TEXT,
     TEXT,
 )
+from asset_browser.file_ops import move_files_to_directory, unique_destination_path
 from asset_browser.image_ops import (
     Image,
     ImageTk,
@@ -113,6 +114,7 @@ __all__ = [
     "load_prompt_template",
     "main",
     "make_color_transparent",
+    "move_files_to_directory",
     "nearest_palette_color",
     "normalize_crop_box",
     "normalize_hex_color",
@@ -129,6 +131,7 @@ __all__ = [
     "save_prompt_template",
     "save_recolored_image",
     "template_path",
+    "unique_destination_path",
     "wheel_scroll_units",
 ]
 

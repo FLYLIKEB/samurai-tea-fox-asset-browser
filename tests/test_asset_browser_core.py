@@ -72,6 +72,50 @@ class AssetBrowserCoreTest(unittest.TestCase):
 
         self.assertEqual(browser.selected_assets(), [first, second])
 
+    def test_visible_assets_preserves_scan_order(self) -> None:
+        browser = core.AssetBrowser.__new__(core.AssetBrowser)
+        first = core.AssetImage(Path("/project/assets/a.png"), Path("assets/a.png"))
+        second = core.AssetImage(Path("/project/assets/b.png"), Path("assets/b.png"))
+        browser.image_by_path = {first.path: first, second.path: second}
+        browser.image_order_by_path = {first.path: 0, second.path: 1}
+        browser.cell_widgets = {
+            second.path: type(
+                "Widgets",
+                (),
+                {"cell": type("Cell", (), {"winfo_y": lambda _self: 10, "winfo_height": lambda _self: 128})()},
+            )(),
+            first.path: type(
+                "Widgets",
+                (),
+                {"cell": type("Cell", (), {"winfo_y": lambda _self: 20, "winfo_height": lambda _self: 128})()},
+            )(),
+        }
+        browser.canvas = type(
+            "Canvas",
+            (),
+            {
+                "canvasy": lambda _self, value: value,
+                "winfo_height": lambda _self: 200,
+            },
+        )()
+
+        self.assertEqual(browser.visible_assets(), [first, second])
+
+    def test_move_files_to_directory_avoids_name_collisions(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "source"
+            target = root / "target"
+            source.mkdir()
+            target.mkdir()
+            (source / "fox.png").write_text("new", encoding="utf-8")
+            (target / "fox.png").write_text("old", encoding="utf-8")
+
+            moved, failures = core.move_files_to_directory([source / "fox.png"], target)
+
+        self.assertEqual(failures, [])
+        self.assertEqual([path.name for path in moved], ["fox_2.png"])
+
     def test_wheel_scroll_units_supports_mac_trackpad_small_delta(self) -> None:
         self.assertEqual(core.wheel_scroll_units(-1, 0.0), (1, 0.0))
         self.assertEqual(core.wheel_scroll_units(1, 0.0), (-1, 0.0))

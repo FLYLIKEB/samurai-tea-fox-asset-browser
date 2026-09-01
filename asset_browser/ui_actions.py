@@ -10,6 +10,7 @@ from tkinter import colorchooser, filedialog, messagebox
 
 from .constants import ART_STYLE_TOKENS_PATH, BUILTIN_PROMPT_TEMPLATE
 from .crop_window import ImageCropWindow
+from .file_ops import move_files_to_directory
 from .image_ops import (
     Image,
     apply_palette_to_images,
@@ -103,6 +104,30 @@ class ActionsMixin:
         if asset is not None:
             self.select_asset_fast(asset)
 
+    def select_visible_images(self) -> None:
+        changed: list[Path] = []
+        for asset in self.visible_assets():
+            if asset.path not in self.selected:
+                self.selected.add(asset.path)
+                changed.append(asset.path)
+        if not changed:
+            return
+        for path in changed:
+            self.update_cell_selection(path)
+        self._set_status()
+        self.schedule_prompt_preview_update()
+
+    def toggle_scroll_select(self) -> None:
+        self.scroll_select_var.set(not self.scroll_select_var.get())
+        self.scroll_select_changed()
+
+    def scroll_select_changed(self) -> None:
+        if self.scroll_select_var.get():
+            self.select_visible_images()
+            self.status_var.set("스크롤 선택 켜짐: 스크롤하면 보이는 이미지가 선택됩니다.")
+        else:
+            self._set_status()
+
     def schedule_toggle_selection(self, asset: AssetImage) -> str:
         if time.monotonic() < self.suppress_single_click_until:
             return "break"
@@ -179,6 +204,41 @@ class ActionsMixin:
             self._copy_text("\n".join(failures) + "\n", "삭제 실패 목록")
             messagebox.showwarning("일부 삭제 실패", f"{deleted}개 삭제, {len(failures)}개 실패")
         self.status_var.set(f"삭제 완료: {deleted}개")
+
+    def move_selected_images(self) -> None:
+        assets = self.selected_assets()
+        if not assets:
+            self._warn_no_selection()
+            return
+
+        destination = filedialog.askdirectory(
+            title="선택 이미지를 이동할 폴더",
+            initialdir=str(self.asset_root),
+        )
+        if not destination:
+            return
+
+        preview = "\n".join(item.relative_path.as_posix() for item in assets[:8])
+        if len(assets) > 8:
+            preview = f"{preview}\n..."
+        ok = messagebox.askokcancel(
+            "선택 이미지 이동",
+            f"선택한 이미지 {len(assets)}개를 다음 폴더로 이동합니다.\n\n"
+            f"{destination}\n\n{preview}\n\n계속할까요?",
+        )
+        if not ok:
+            return
+
+        moved, failures = move_files_to_directory(
+            [asset.path for asset in assets],
+            Path(destination),
+        )
+        self.selected.clear()
+        self.rescan()
+        if failures:
+            self._copy_text("\n".join(failures) + "\n", "이동 실패 목록")
+            messagebox.showwarning("일부 이동 실패", f"{len(moved)}개 이동, {len(failures)}개 실패")
+        self.status_var.set(f"이동 완료: {len(moved)}개 -> {destination}")
 
     def copy_relative_paths(self) -> None:
         self._copy_lines(self.selected_relative_paths(), "상대경로")
