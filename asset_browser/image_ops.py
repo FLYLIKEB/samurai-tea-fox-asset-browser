@@ -1,4 +1,4 @@
-"""Pillow-backed palette preview and destructive image conversion."""
+"""Pillow-backed palette preview, conversion, and crop helpers."""
 
 from __future__ import annotations
 
@@ -54,6 +54,57 @@ def save_recolored_image(path: Path, palette: list[tuple[int, int, int]]) -> Non
         if suffix in {".jpg", ".jpeg"}:
             recolored = recolored.convert("RGB")
         recolored.save(path)
+
+def image_size(path: Path) -> tuple[int, int]:
+    if Image is not None:
+        with Image.open(path) as opened:
+            return opened.size
+
+    raise RuntimeError("이미지 크기를 읽으려면 Pillow가 필요합니다.")
+
+def is_larger_than_tile(path: Path, tile_size: int = 32) -> bool:
+    width, height = image_size(path)
+    return width > tile_size or height > tile_size
+
+def normalize_crop_box(
+    start: tuple[int, int],
+    end: tuple[int, int],
+    image_size_value: tuple[int, int],
+) -> tuple[int, int, int, int] | None:
+    width, height = image_size_value
+    x1 = max(0, min(start[0], end[0], width))
+    y1 = max(0, min(start[1], end[1], height))
+    x2 = max(0, min(max(start[0], end[0]), width))
+    y2 = max(0, min(max(start[1], end[1]), height))
+
+    if x2 <= x1 or y2 <= y1:
+        return None
+    return x1, y1, x2, y2
+
+def default_crop_output_path(source: Path, box: tuple[int, int, int, int]) -> Path:
+    x1, y1, x2, y2 = box
+    width = x2 - x1
+    height = y2 - y1
+    suffix = source.suffix if source.suffix.lower() in {".png", ".jpg", ".jpeg"} else ".png"
+    candidate = source.with_name(f"{source.stem}_crop_{x1}_{y1}_{width}x{height}{suffix}")
+    index = 2
+    while candidate.exists():
+        candidate = source.with_name(
+            f"{source.stem}_crop_{x1}_{y1}_{width}x{height}_{index}{suffix}"
+        )
+        index += 1
+    return candidate
+
+def crop_image_to_file(source: Path, target: Path, box: tuple[int, int, int, int]) -> None:
+    if Image is None:
+        raise RuntimeError("이미지 크롭에는 Pillow가 필요합니다.")
+
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with Image.open(source) as opened:
+        cropped = opened.convert("RGBA").crop(box)
+        if target.suffix.lower() in {".jpg", ".jpeg"}:
+            cropped = cropped.convert("RGB")
+        cropped.save(target)
 
 def apply_palette_to_images(
     image_paths: list[Path],

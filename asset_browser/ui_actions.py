@@ -8,7 +8,8 @@ import tkinter as tk
 from tkinter import filedialog, messagebox
 
 from .constants import ART_STYLE_TOKENS_PATH, BUILTIN_PROMPT_TEMPLATE
-from .image_ops import Image, apply_palette_to_images
+from .crop_window import ImageCropWindow
+from .image_ops import Image, apply_palette_to_images, is_larger_than_tile
 from .paths import palette_backup_root, template_path
 from .prompting import load_prompt_template, render_prompt_template, save_prompt_template
 from .scanner import find_images
@@ -96,6 +97,23 @@ class ActionsMixin:
         )
         self.set_prompt_text(prompt, dirty=False)
         self._copy_text(prompt, "단일 이미지 프롬프트")
+
+    def open_crop_or_copy_prompt(self, asset: AssetImage) -> None:
+        try:
+            should_crop = is_larger_than_tile(asset.path)
+        except Exception as exc:
+            messagebox.showerror("이미지 확인 실패", f"{asset.path}\n\n{exc}")
+            return
+
+        if not should_crop:
+            self.copy_single_prompt(asset)
+            return
+
+        ImageCropWindow(self, asset, self._crop_saved)
+
+    def _crop_saved(self, path: Path) -> None:
+        self.rescan()
+        self.status_var.set(f"크롭 저장 완료: {path}")
 
     def reset_prompt(self) -> None:
         self.update_prompt_preview(force=True)

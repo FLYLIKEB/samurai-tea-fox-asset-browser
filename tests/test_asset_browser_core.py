@@ -86,5 +86,38 @@ class AssetBrowserCoreTest(unittest.TestCase):
 
         self.assertEqual(list(recolored.getdata()), [(255, 255, 255, 255), (10, 20, 30, 0)])
 
+    def test_normalize_crop_box_sorts_and_clamps_coordinates(self) -> None:
+        box = core.normalize_crop_box((90, 50), (-10, 20), (64, 64))
+
+        self.assertEqual(box, (0, 20, 64, 50))
+
+    def test_normalize_crop_box_rejects_empty_selection(self) -> None:
+        box = core.normalize_crop_box((10, 10), (10, 30), (64, 64))
+
+        self.assertIsNone(box)
+
+    def test_default_crop_output_path_uses_source_folder_and_original_coordinates(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "sheet.png"
+
+            target = core.default_crop_output_path(source, (32, 64, 64, 96))
+
+        self.assertEqual(target.name, "sheet_crop_32_64_32x32.png")
+
+    @unittest.skipIf(core.Image is None, "Pillow is not installed")
+    def test_crop_image_to_file_saves_original_pixel_region(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "source.png"
+            target = Path(tmp) / "crop.png"
+            image = core.Image.new("RGBA", (4, 4), (0, 0, 0, 0))
+            image.putpixel((2, 1), (255, 0, 0, 255))
+            image.save(source)
+
+            core.crop_image_to_file(source, target, (2, 1, 3, 2))
+
+            with core.Image.open(target) as cropped:
+                self.assertEqual(cropped.size, (1, 1))
+                self.assertEqual(cropped.convert("RGBA").getpixel((0, 0)), (255, 0, 0, 255))
+
 if __name__ == "__main__":
     unittest.main()

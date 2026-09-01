@@ -171,7 +171,7 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
 
         for widget in (cell, image_box, image_label, name_label, detail_label):
             widget.bind("<Button-1>", lambda _event, asset=item: self.toggle_selection(asset))
-            widget.bind("<Double-Button-1>", lambda _event, asset=item: self.copy_single_prompt(asset))
+            widget.bind("<Double-Button-1>", lambda _event, asset=item: self.open_crop_or_copy_prompt(asset))
 
     def _load_thumbnail(self, path: Path) -> tuple[tk.PhotoImage | None, str]:
         scale = max(1, self.scale_var.get())

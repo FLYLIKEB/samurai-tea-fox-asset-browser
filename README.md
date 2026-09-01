@@ -45,6 +45,8 @@ asset-browser --project-root /path/to/game
 - 실제 변환 전 확인 팝업을 띄우고, 원본은 `tools/asset_browser/palette_backups/` 아래에 자동 백업합니다.
 - 스캔 폴더, 기본 프롬프트 템플릿, 아트 스타일 토큰 파일을 Finder에서 바로 볼 수 있습니다.
 - 선택한 상대경로 목록을 `.txt` 파일로 저장합니다.
+- 32x32보다 큰 이미지는 더블클릭해 원본 픽셀 좌표 기준으로 영역을 드래그하고 새 PNG/JPEG로 크롭 저장할 수 있습니다.
+- 크롭 창에서 한 번 클릭하면 32x32 영역이 잡히고, `32x32 맞춤`으로 현재 선택 영역을 타일 크기에 맞출 수 있습니다.
 
 기본 프롬프트 템플릿에서 쓸 수 있는 치환값:
 
@@ -60,6 +62,7 @@ GIF 등은 미리볼 수 있습니다.
 
 - `asset_browser.py`: 직접 실행용 호환 래퍼입니다.
 - `cli.py`: 인자 파싱과 CLI 실행 흐름입니다.
+- `crop_window.py`: 원본 픽셀 좌표 기준 크롭 창입니다.
 - `ui_app.py`: `AssetBrowser` 상태와 이미지 그리드 렌더링입니다.
 - `ui_layout.py`: Tkinter 레이아웃 구성입니다.
 - `ui_actions.py`: 선택, 복사, 템플릿 저장, Finder 열기, 실제 팔레트 변환 액션입니다.
