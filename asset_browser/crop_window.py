@@ -46,6 +46,7 @@ class ImageCropWindow(tk.Toplevel):
         self.preview_ref: tk.PhotoImage | None = None
         self.rect_id: int | None = None
         self.queued_rect_ids: list[int] = []
+        self.tool_buttons: dict[str, tk.Button] = {}
         self.last_saved_path: Path | None = None
         self.image_id: int | None = None
         self.tool_mode = tk.StringVar(value="crop")
@@ -73,86 +74,46 @@ class ImageCropWindow(tk.Toplevel):
         self.focus_set()
 
     def _build_ui(self) -> None:
-        header = tk.Frame(self, bg=PANEL, padx=10, pady=7)
-        header.pack(side=tk.TOP, fill=tk.X)
-
+        top_bar = tk.Frame(self, bg=PANEL, padx=10, pady=6)
+        top_bar.pack(side=tk.TOP, fill=tk.X)
         tk.Label(
-            header,
+            top_bar,
             text=f"{self.asset.relative_path.as_posix()}  {self.image_width}x{self.image_height}",
             bg=PANEL,
             fg=TEXT,
             anchor="w",
-        ).pack(side=tk.TOP, fill=tk.X)
+        ).pack(side=tk.LEFT, fill=tk.X, expand=True)
 
-        primary_actions = tk.Frame(header, bg=PANEL)
-        primary_actions.pack(side=tk.TOP, fill=tk.X, pady=(7, 0))
-        secondary_actions = tk.Frame(header, bg=PANEL)
-        secondary_actions.pack(side=tk.TOP, fill=tk.X, pady=(4, 0))
+        info = tk.Label(self, textvariable=self.info_var, bg=PANEL, fg=MUTED, anchor="w", padx=10, pady=4)
+        info.pack(side=tk.BOTTOM, fill=tk.X)
 
-        self._button(primary_actions, "✂ 크롭 (V)", self.use_crop_tool, width=12).pack(
-            side=tk.LEFT, padx=(0, 5)
-        )
-        self._button(primary_actions, "□ 32x32 (X)", self.fit_32, width=13).pack(
-            side=tk.LEFT, padx=(0, 5)
-        )
-        self._button(primary_actions, "◆ 저장 (⌘S)", self.save_crop, width=13).pack(
-            side=tk.LEFT, padx=(0, 5)
-        )
-        self._button(primary_actions, "+ 영역 추가 (Space)", self.queue_current_box, width=18).pack(
-            side=tk.LEFT, padx=(0, 5)
-        )
-        self._button(primary_actions, "◆ 모두 저장 (⇧⌘S)", self.save_all_crops, width=18).pack(
-            side=tk.LEFT
-        )
-        self._button(secondary_actions, "▣ 페인트 (P)", self.use_paint_tool, width=11).pack(
-            side=tk.LEFT, padx=(0, 5)
-        )
-        self._button(secondary_actions, "⌖ 스포이드 (I)", self.use_eyedropper_tool, width=12).pack(
-            side=tk.LEFT, padx=(0, 5)
-        )
-        self.paint_color_swatch = tk.Button(
-            secondary_actions,
-            text="색",
-            command=self.choose_paint_color,
-            bg=self.paint_color_var.get(),
-            activebackground=self.paint_color_var.get(),
-            fg=TEXT,
-            relief=tk.FLAT,
-            width=4,
-            padx=2,
-            pady=3,
-            highlightthickness=0,
-        )
-        self.paint_color_swatch.pack(side=tk.LEFT, padx=(0, 4))
-        self._add_palette_chips(secondary_actions)
-        tk.Label(secondary_actions, text="범위", bg=PANEL, fg=MUTED).pack(side=tk.LEFT, padx=(4, 2))
-        tk.Spinbox(
-            secondary_actions,
-            from_=0,
-            to=255,
-            textvariable=self.paint_tolerance_var,
-            width=4,
-            bg=BG,
-            fg=TEXT,
-            relief=tk.FLAT,
-            increment=4,
-        ).pack(side=tk.LEFT, padx=(0, 5))
-        self._button(secondary_actions, "◫ 외곽 투명화 (T)", self.apply_transparency, width=15).pack(
-            side=tk.LEFT, padx=(0, 5)
-        )
-        self._button(secondary_actions, "⬇ 편집 저장 (⌘P)", self.save_edited_image, width=15).pack(
-            side=tk.LEFT, padx=(0, 5)
-        )
-        self._button(secondary_actions, "× 초기화 (C)", self.clear_queued_boxes, width=10).pack(
-            side=tk.LEFT, padx=(0, 5)
-        )
-        self._button(secondary_actions, "닫기 (Esc)", self.destroy, width=10).pack(side=tk.LEFT)
+        editor = tk.Frame(self, bg=BG)
+        editor.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+        editor.columnconfigure(1, weight=1)
+        editor.rowconfigure(0, weight=1)
 
-        info = tk.Label(self, textvariable=self.info_var, bg=BG, fg=MUTED, anchor="w", padx=10, pady=5)
-        info.pack(side=tk.TOP, fill=tk.X)
+        tool_rail = tk.Frame(
+            editor,
+            bg=PANEL,
+            padx=5,
+            pady=6,
+            highlightthickness=1,
+            highlightbackground=BORDER,
+        )
+        tool_rail.grid(row=0, column=0, sticky="ns", padx=(8, 4), pady=8)
+        self.tool_buttons["crop"] = self._tool_button(tool_rail, "✂\n크롭\nV", self.use_crop_tool)
+        self.tool_buttons["paint"] = self._tool_button(tool_rail, "▣\n페인트\nP", self.use_paint_tool)
+        self.tool_buttons["eyedropper"] = self._tool_button(
+            tool_rail,
+            "⌖\n스포이드\nI",
+            self.use_eyedropper_tool,
+        )
+        self._tool_button(tool_rail, "◫\n외곽\nT", self.apply_transparency)
+        self._tool_spacer(tool_rail)
+        self._tool_button(tool_rail, "×\n초기화\nC", self.clear_queued_boxes)
 
-        canvas_shell = tk.Frame(self, bg=BG)
-        canvas_shell.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+        canvas_shell = tk.Frame(editor, bg=BG)
+        canvas_shell.grid(row=0, column=1, sticky="nsew", padx=4, pady=8)
 
         self.canvas = tk.Canvas(canvas_shell, bg=BG, highlightthickness=1, highlightbackground=BORDER)
         x_scroll = tk.Scrollbar(canvas_shell, orient=tk.HORIZONTAL, command=self.canvas.xview)
@@ -164,6 +125,85 @@ class ImageCropWindow(tk.Toplevel):
         x_scroll.grid(row=1, column=0, sticky="ew")
         canvas_shell.columnconfigure(0, weight=1)
         canvas_shell.rowconfigure(0, weight=1)
+
+        inspector = tk.Frame(
+            editor,
+            bg=PANEL,
+            padx=8,
+            pady=8,
+            highlightthickness=1,
+            highlightbackground=BORDER,
+            width=230,
+        )
+        inspector.grid(row=0, column=2, sticky="ns", padx=(4, 8), pady=8)
+        inspector.grid_propagate(False)
+
+        self._section_label(inspector, "색상")
+        color_row = tk.Frame(inspector, bg=PANEL)
+        color_row.pack(side=tk.TOP, fill=tk.X)
+        self.paint_color_swatch = tk.Button(
+            color_row,
+            text="현재 색",
+            command=self.choose_paint_color,
+            bg=self.paint_color_var.get(),
+            activebackground=self.paint_color_var.get(),
+            fg=TEXT,
+            relief=tk.FLAT,
+            width=9,
+            padx=2,
+            pady=4,
+            highlightthickness=0,
+        )
+        self.paint_color_swatch.pack(side=tk.LEFT, padx=(0, 5))
+        self._add_palette_chips(color_row)
+        tk.Label(inspector, text="허용 범위", bg=PANEL, fg=MUTED, anchor="w").pack(
+            side=tk.TOP,
+            fill=tk.X,
+            pady=(10, 2),
+        )
+        tk.Spinbox(
+            inspector,
+            from_=0,
+            to=255,
+            textvariable=self.paint_tolerance_var,
+            width=8,
+            bg=BG,
+            fg=TEXT,
+            relief=tk.FLAT,
+            increment=4,
+        ).pack(side=tk.TOP, anchor="w")
+
+        self._section_label(inspector, "크롭", pady=(16, 4))
+        self._button(inspector, "□ 32x32 맞춤 (X)", self.fit_32, width=21).pack(
+            side=tk.TOP,
+            fill=tk.X,
+            pady=(0, 4),
+        )
+        self._button(inspector, "+ 영역 추가 (Space)", self.queue_current_box, width=21).pack(
+            side=tk.TOP,
+            fill=tk.X,
+            pady=(0, 4),
+        )
+
+        self._section_label(inspector, "저장", pady=(16, 4))
+        self._button(inspector, "◆ 크롭 저장 (⌘S)", self.save_crop, width=21).pack(
+            side=tk.TOP,
+            fill=tk.X,
+            pady=(0, 4),
+        )
+        self._button(inspector, "◆ 대기 모두 저장 (⇧⌘S)", self.save_all_crops, width=21).pack(
+            side=tk.TOP,
+            fill=tk.X,
+            pady=(0, 4),
+        )
+        self._button(inspector, "⬇ 원본 덮어쓰기 (⌘P)", self.save_edited_image, width=21).pack(
+            side=tk.TOP,
+            fill=tk.X,
+            pady=(0, 4),
+        )
+
+        tk.Frame(inspector, bg=PANEL).pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+        self._button(inspector, "닫기 (Esc)", self.destroy, width=21).pack(side=tk.BOTTOM, fill=tk.X)
 
         self.canvas.bind("<ButtonPress-1>", self._start_crop)
         self.canvas.bind("<B1-Motion>", self._drag_crop)
@@ -183,6 +223,7 @@ class ImageCropWindow(tk.Toplevel):
         self.bind("<Control-s>", lambda _event: self.save_shortcut())
         self.bind("<Control-Shift-s>", lambda _event: self.save_all_crops())
         self.bind("<Control-p>", lambda _event: self.save_edited_image())
+        self._refresh_tool_buttons()
 
     def _add_palette_chips(self, parent: tk.Widget) -> None:
         for rgb in self.palette_colors[:8]:
@@ -217,6 +258,47 @@ class ImageCropWindow(tk.Toplevel):
             highlightthickness=0,
             **options,
         )
+
+    def _tool_button(self, parent: tk.Widget, text: str, command) -> tk.Button:
+        button = tk.Button(
+            parent,
+            text=text,
+            command=command,
+            bg=BG,
+            fg=TEXT,
+            activebackground=PANEL,
+            activeforeground=TEXT,
+            relief=tk.FLAT,
+            width=8,
+            height=3,
+            padx=2,
+            pady=3,
+            highlightthickness=0,
+            justify=tk.CENTER,
+        )
+        button.pack(side=tk.TOP, pady=(0, 5))
+        return button
+
+    def _tool_spacer(self, parent: tk.Widget) -> None:
+        tk.Frame(parent, bg=PANEL, height=8).pack(side=tk.TOP, fill=tk.X)
+
+    def _section_label(self, parent: tk.Widget, text: str, pady: tuple[int, int] = (0, 4)) -> None:
+        tk.Label(
+            parent,
+            text=text,
+            bg=PANEL,
+            fg=MUTED,
+            anchor="w",
+            font=("TkDefaultFont", 9, "bold"),
+        ).pack(side=tk.TOP, fill=tk.X, pady=pady)
+
+    def _refresh_tool_buttons(self) -> None:
+        active_tool = self.tool_mode.get()
+        for name, button in self.tool_buttons.items():
+            if name == active_tool:
+                button.configure(bg=SELECTED, fg="#ffffff", activebackground=SELECTED)
+            else:
+                button.configure(bg=BG, fg=TEXT, activebackground=PANEL)
 
     def _initial_scale(self) -> float:
         scale = min(MAX_INITIAL_WIDTH / self.image_width, MAX_INITIAL_HEIGHT / self.image_height)
@@ -316,16 +398,19 @@ class ImageCropWindow(tk.Toplevel):
 
     def use_crop_tool(self) -> str:
         self.tool_mode.set("crop")
+        self._refresh_tool_buttons()
         self._show_box_status()
         return "break"
 
     def use_paint_tool(self) -> str:
         self.tool_mode.set("paint")
+        self._refresh_tool_buttons()
         self._show_box_status()
         return "break"
 
     def use_eyedropper_tool(self) -> str:
         self.tool_mode.set("eyedropper")
+        self._refresh_tool_buttons()
         self._show_box_status()
         return "break"
 
@@ -352,6 +437,7 @@ class ImageCropWindow(tk.Toplevel):
         red, green, blue, _alpha = self.original.getpixel(point)
         self.set_paint_color(self._rgb_to_hex((red, green, blue)))
         self.tool_mode.set("paint")
+        self._refresh_tool_buttons()
         self._show_box_status()
         return "break"
 
