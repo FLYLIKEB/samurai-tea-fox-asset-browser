@@ -195,6 +195,10 @@ class AssetBrowserCoreTest(unittest.TestCase):
         self.assertEqual(core.parse_image_size("32x64"), (32, 64))
         self.assertEqual(core.parse_image_size(" 64 X 32 "), (64, 32))
 
+    def test_resize_choices_include_tall_character_sizes(self) -> None:
+        self.assertIn("64x96", core.RESIZE_CHOICES)
+        self.assertIn("96x128", core.RESIZE_CHOICES)
+
     def test_default_resize_output_path_uses_png_and_avoids_collisions(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             source = Path(tmp) / "tile.jpg"

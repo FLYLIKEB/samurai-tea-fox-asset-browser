@@ -64,13 +64,29 @@ class ImageCropWindow(tk.Toplevel):
             bg=PANEL,
             fg=TEXT,
             anchor="w",
-        ).pack(side=tk.LEFT, fill=tk.X, expand=True)
+        ).pack(side=tk.TOP, fill=tk.X)
 
-        self._button(header, "× 초기화 (C)", self.clear_queued_boxes).pack(side=tk.RIGHT, padx=(6, 0))
-        self._button(header, "◆ 모두 저장 (⇧⌘S)", self.save_all_crops).pack(side=tk.RIGHT, padx=(6, 0))
-        self._button(header, "+ 영역 추가 (Space)", self.queue_current_box).pack(side=tk.RIGHT, padx=(6, 0))
-        self._button(header, "◆ 저장 (⌘S)", self.save_crop).pack(side=tk.RIGHT, padx=(6, 0))
-        self._button(header, "□ 32x32 (X)", self.fit_32).pack(side=tk.RIGHT, padx=(6, 0))
+        primary_actions = tk.Frame(header, bg=PANEL)
+        primary_actions.pack(side=tk.TOP, fill=tk.X, pady=(7, 0))
+        secondary_actions = tk.Frame(header, bg=PANEL)
+        secondary_actions.pack(side=tk.TOP, fill=tk.X, pady=(4, 0))
+
+        self._button(primary_actions, "□ 32x32 (X)", self.fit_32, width=13).pack(
+            side=tk.LEFT, padx=(0, 5)
+        )
+        self._button(primary_actions, "◆ 저장 (⌘S)", self.save_crop, width=13).pack(
+            side=tk.LEFT, padx=(0, 5)
+        )
+        self._button(primary_actions, "+ 영역 추가 (Space)", self.queue_current_box, width=18).pack(
+            side=tk.LEFT
+        )
+        self._button(secondary_actions, "◆ 모두 저장 (⇧⌘S)", self.save_all_crops, width=18).pack(
+            side=tk.LEFT, padx=(0, 5)
+        )
+        self._button(secondary_actions, "× 초기화 (C)", self.clear_queued_boxes, width=13).pack(
+            side=tk.LEFT, padx=(0, 5)
+        )
+        self._button(secondary_actions, "닫기 (Esc)", self.destroy, width=13).pack(side=tk.LEFT)
 
         info = tk.Label(self, textvariable=self.info_var, bg=BG, fg=MUTED, anchor="w", padx=10, pady=5)
         info.pack(side=tk.TOP, fill=tk.X)
@@ -102,7 +118,8 @@ class ImageCropWindow(tk.Toplevel):
         self.bind("<Control-s>", lambda _event: self.save_shortcut())
         self.bind("<Control-Shift-s>", lambda _event: self.save_all_crops())
 
-    def _button(self, parent: tk.Widget, text: str, command) -> tk.Button:
+    def _button(self, parent: tk.Widget, text: str, command, width: int | None = None) -> tk.Button:
+        options = {"width": width} if width is not None else {}
         return tk.Button(
             parent,
             text=text,
@@ -115,6 +132,7 @@ class ImageCropWindow(tk.Toplevel):
             padx=9,
             pady=3,
             highlightthickness=0,
+            **options,
         )
 
     def _initial_scale(self) -> float:

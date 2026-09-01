@@ -19,7 +19,24 @@ IMAGE_EXTENSIONS = {
 }
 
 SCALE_CHOICES = (2, 3, 4, 5, 6, 8)
-RESIZE_CHOICES = ("32x32", "32x64", "64x32", "64x64", "96x96", "128x128")
+RESIZE_CHOICES = (
+    "32x32",
+    "32x64",
+    "64x32",
+    "32x96",
+    "96x32",
+    "32x128",
+    "128x32",
+    "64x64",
+    "64x96",
+    "96x64",
+    "64x128",
+    "128x64",
+    "96x96",
+    "96x128",
+    "128x96",
+    "128x128",
+)
 GRID_CELL_PITCH = 140
 GRID_CELL_WIDTH = 132
 GRID_CELL_HEIGHT = 162
