@@ -119,7 +119,8 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         title.pack(side=tk.LEFT)
 
     def _add_cell(self, item: AssetImage, row: int, column: int) -> None:
-        bg, fg, meta_fg = self._cell_colors(item.path in self.selected)
+        is_selected = item.path in self.selected
+        bg, fg, meta_fg = self._cell_colors(is_selected)
 
         cell = tk.Frame(
             self.grid_frame,
