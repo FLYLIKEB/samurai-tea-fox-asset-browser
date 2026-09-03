@@ -84,28 +84,21 @@ def image_info(path: Path) -> tuple[tuple[int, int], bool]:
         return opened.size, image_has_transparency(opened)
 
 
-def checkerboard_image(size: tuple[int, int], cell_size: int = 4):
+def black_background_image(size: tuple[int, int]):
     if Image is None:
-        raise RuntimeError("체커 배경 생성에는 Pillow가 필요합니다.")
+        raise RuntimeError("검정 배경 생성에는 Pillow가 필요합니다.")
 
-    width, height = size
-    board = Image.new("RGBA", size, (255, 255, 255, 255))
-    pixels = board.load()
-    for y in range(height):
-        for x in range(width):
-            if ((x // cell_size) + (y // cell_size)) % 2:
-                pixels[x, y] = (224, 224, 229, 255)
-    return board
+    return Image.new("RGBA", size, (0, 0, 0, 255))
 
 
-def composite_on_checkerboard(image, cell_size: int = 4):
+def composite_on_black_background(image):
     rgba = image.convert("RGBA")
     if not image_has_transparency(rgba):
         return rgba
 
-    board = checkerboard_image(rgba.size, cell_size)
-    board.alpha_composite(rgba)
-    return board
+    background = black_background_image(rgba.size)
+    background.alpha_composite(rgba)
+    return background
 
 
 def is_larger_than_tile(path: Path, tile_size: int = 32) -> bool:

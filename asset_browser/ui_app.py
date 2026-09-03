@@ -9,7 +9,7 @@ import tkinter as tk
 
 from .constants import BG, BORDER, ERROR, MUTED, PANEL, SELECTED, SELECTED_TEXT, TEXT
 from .constants import GRID_CELL_PITCH
-from .image_ops import Image, ImageTk, composite_on_checkerboard, recolor_image_to_palette
+from .image_ops import Image, ImageTk, composite_on_black_background, recolor_image_to_palette
 from .models import AssetImage
 from .prompting import load_prompt_template
 from .scanner import folder_group_label
@@ -437,7 +437,7 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
                     resampling = getattr(Image, "Resampling", Image)
                     image = image.resize((target_width, target_height), resampling.NEAREST)
                     if has_transparency is True:
-                        image = composite_on_checkerboard(image)
+                        image = composite_on_black_background(image)
                     return (
                         ImageTk.PhotoImage(image),
                         f"{width}x{height} | {tiles_wide}x{tiles_high}타일 | {transparency_meta}{meta_suffix}",

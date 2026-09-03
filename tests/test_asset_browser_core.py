@@ -130,14 +130,14 @@ class AssetBrowserCoreTest(unittest.TestCase):
             self.assertEqual(core.image_info(opaque), ((2, 1), False))
 
     @unittest.skipIf(core.Image is None, "Pillow is not installed")
-    def test_composite_on_checkerboard_reveals_transparent_pixels(self) -> None:
+    def test_composite_on_black_background_reveals_transparent_pixels(self) -> None:
         image = core.Image.new("RGBA", (2, 1), (10, 20, 30, 255))
         image.putpixel((1, 0), (10, 20, 30, 0))
 
-        composited = core.composite_on_checkerboard(image, cell_size=1)
+        composited = core.composite_on_black_background(image)
 
         self.assertEqual(composited.getpixel((0, 0)), (10, 20, 30, 255))
-        self.assertEqual(composited.getpixel((1, 0)), (224, 224, 229, 255))
+        self.assertEqual(composited.getpixel((1, 0)), (0, 0, 0, 255))
 
     def test_tile_size_group_labels_large_images_as_summary(self) -> None:
         self.assertEqual(core.tile_size_group_label((32, 32)), "32x32")
