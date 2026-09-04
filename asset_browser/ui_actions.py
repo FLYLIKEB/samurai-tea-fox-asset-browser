@@ -159,6 +159,18 @@ class ActionsMixin:
         self.render_grid()
         self.status_var.set("모든 폴더를 접었습니다.")
 
+    def navigate_to_asset_folder(self, folder: Path) -> str:
+        target = folder.expanduser()
+        if not target.is_absolute():
+            target = (self.project_root / target).resolve()
+        self.path_var.set(str(target))
+        self.filter_var.set("")
+        self.expanded_group_labels.clear()
+        self.default_expanded_group_labels.clear()
+        self.rescan()
+        self.status_var.set(f"폴더로 이동: {target}")
+        return "break"
+
     def schedule_toggle_selection(self, asset: AssetImage) -> str:
         if time.monotonic() < self.suppress_single_click_until:
             return "break"
@@ -628,13 +640,14 @@ class ActionsMixin:
         else:
             self._set_status()
 
-    def apply_palette_to_shown_images(self) -> None:
+    def apply_palette_to_selected_images(self) -> None:
         if Image is None:
             messagebox.showerror("Pillow 필요", "실제 이미지 변환에는 Pillow가 필요합니다.")
             return
 
-        if not self.filtered_images:
-            messagebox.showinfo("이미지 없음", "변환할 표시 이미지가 없습니다.")
+        assets = self.selected_assets()
+        if not assets:
+            self._warn_no_selection()
             return
 
         palette = extract_palette_colors(self.art_style_data, self.selected_palette_candidate_id())
@@ -643,18 +656,22 @@ class ActionsMixin:
             return
 
         backup_root = palette_backup_root(self.project_root)
-        count = len(self.filtered_images)
+        count = len(assets)
+        preview = "\n".join(item.relative_path.as_posix() for item in assets[:8])
+        if len(assets) > 8:
+            preview = f"{preview}\n..."
         ok = messagebox.askokcancel(
             "실제 이미지 변환 확인",
-            "현재 화면에 표시된 이미지 전체를 팔레트 색으로 실제 변환합니다.\n\n"
+            "선택한 이미지를 팔레트 색으로 실제 변환합니다.\n\n"
             f"대상: {count}개\n"
+            f"{preview}\n\n"
             f"백업 위치: {backup_root}\n\n"
             "원본 파일이 덮어써집니다. 계속할까요?",
         )
         if not ok:
             return
 
-        paths = [item.path for item in self.filtered_images]
+        paths = [item.path for item in assets]
         converted, failures = apply_palette_to_images(paths, palette, self.project_root, backup_root)
         self.rescan()
         if failures:
@@ -670,3 +687,6 @@ class ActionsMixin:
                 f"{converted}개 이미지를 변환했습니다.\n백업 위치: {backup_root}",
             )
         self.status_var.set(f"팔레트 실제 변환 완료: {converted}개 | 백업: {backup_root}")
+
+    def apply_palette_to_shown_images(self) -> None:
+        self.apply_palette_to_selected_images()

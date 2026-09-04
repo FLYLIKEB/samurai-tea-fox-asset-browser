@@ -163,6 +163,13 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
             cursor="pointinghand",
         )
         title.pack(side=tk.LEFT)
+        folder = self.folder_path_for_group(images)
+        if folder is not None:
+            self._button(
+                header,
+                "↪ 폴더",
+                lambda target=folder: self.navigate_to_asset_folder(target),
+            ).pack(side=tk.LEFT, padx=(8, 0))
         summary = tk.Label(
             header,
             text=f"{len(images)}개 | 투명 {transparent_count} | 불투명 {len(images) - transparent_count}",
@@ -175,6 +182,11 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         summary.pack(side=tk.RIGHT)
         for widget in (header, title, summary):
             widget.bind("<Button-1>", lambda _event, group_label=label: self.toggle_group(group_label))
+
+    def folder_path_for_group(self, images: list[AssetImage]) -> Path | None:
+        if not images:
+            return None
+        return images[0].path.parent
 
     def current_group_labels(self) -> list[str]:
         return [label for label, _images in self.grouped_images_for_render()]
