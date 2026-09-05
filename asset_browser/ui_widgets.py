@@ -73,7 +73,9 @@ BUTTON_HELP = {
     "use_eraser_tool": "드래그한 픽셀을 완전히 투명하게 지웁니다. 단축키: E",
     "use_line_tool": "시작점부터 끝점까지 1픽셀 직선을 그립니다. 단축키: L",
     "use_paint_tool": "연결된 같은 색 영역을 현재 색으로 채웁니다. 단축키: G",
-    "use_eyedropper_tool": "이미지에서 클릭한 픽셀의 색을 선택합니다. 단축키: I",
+    "use_eyedropper_tool": "이미지에서 클릭한 픽셀을 페인트 및 치환 결과색으로 선택합니다. 단축키: I",
+    "use_replace_source_eyedropper": "캔버스에서 치환할 원본색을 직접 찍습니다.",
+    "choose_replace_source_color": "색상 선택기를 열어 치환할 원본색을 고릅니다.",
     "use_hand_tool": "드래그로 확대된 캔버스를 이동합니다. 단축키: H 또는 Space",
     "apply_transparency": "이미지 외곽과 연결된 배경색을 투명하게 만듭니다. 단축키: T",
 }

@@ -3,6 +3,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from asset_browser import asset_browser as core
 from asset_browser import ui_actions
@@ -43,6 +44,8 @@ class AssetBrowserCoreTest(unittest.TestCase):
             "apply_palette_to_selected_images",
             "adjust_selected_images",
             "save_edited_image",
+            "use_replace_source_eyedropper",
+            "choose_replace_source_color",
         }
 
         self.assertTrue(required_commands.issubset(BUTTON_HELP))
@@ -230,6 +233,79 @@ class AssetBrowserCoreTest(unittest.TestCase):
         self.assertEqual(next_zoom_scale(8.0, -1), 4.0)
         self.assertEqual(next_zoom_scale(32.0, 1), 32.0)
         self.assertEqual(next_zoom_scale(0.25, -1), 0.25)
+
+    @unittest.skipIf(core.Image is None, "Pillow is not installed")
+    def test_editor_replace_action_uses_selected_source_and_target_colors(self) -> None:
+        editor = ImageCropWindow.__new__(ImageCropWindow)
+        editor.original = core.Image.new("RGBA", (2, 1), (12, 34, 56, 255))
+        editor.original.putpixel((1, 0), (1, 2, 3, 255))
+        editor.replace_source_var = FakeVar("0c2238")
+        editor.paint_color_var = FakeVar("#C86432")
+        editor.paint_tolerance_var = FakeVar(0)
+        editor.replace_source_swatch = type(
+            "Swatch",
+            (),
+            {"configure": lambda _self, **_kwargs: None},
+        )()
+        editor.paint_color_swatch = type(
+            "Swatch",
+            (),
+            {"configure": lambda _self, **_kwargs: None},
+        )()
+        editor.last_changed_pixels = 0
+        editor.edit_dirty = False
+        undo_snapshots = []
+        editor._record_undo = lambda image: undo_snapshots.append(image.copy())
+        editor._render_image = lambda: None
+        editor._show_box_status = lambda: None
+
+        editor.replace_all_colors()
+
+        self.assertEqual(editor.original.getpixel((0, 0)), (200, 100, 50, 255))
+        self.assertEqual(editor.original.getpixel((1, 0)), (1, 2, 3, 255))
+        self.assertEqual(editor.replace_source_var.get(), "#0C2238")
+        self.assertEqual(editor.last_changed_pixels, 1)
+        self.assertTrue(editor.edit_dirty)
+        self.assertEqual(len(undo_snapshots), 1)
+
+    @unittest.skipIf(core.Image is None, "Pillow is not installed")
+    def test_source_eyedropper_sets_replace_color_and_returns_to_previous_tool(self) -> None:
+        editor = ImageCropWindow.__new__(ImageCropWindow)
+        editor.original = core.Image.new("RGBA", (1, 1), (12, 34, 56, 255))
+        editor.replace_source_var = FakeVar("#FFFFFF")
+        editor.paint_color_var = FakeVar("#ABCDEF")
+        editor.replace_source_swatch = type(
+            "Swatch",
+            (),
+            {"configure": lambda _self, **_kwargs: None},
+        )()
+        editor.tool_mode = FakeVar("eyedropper")
+        editor.eyedropper_target = "replace_source"
+        editor.eyedropper_return_tool = "crop"
+        editor._to_pixel_point = lambda _event: (0, 0)
+        editor._refresh_tool_buttons = lambda: None
+        editor._show_box_status = lambda: None
+
+        editor.pick_color_at_event(object())
+
+        self.assertEqual(editor.replace_source_var.get(), "#0C2238")
+        self.assertEqual(editor.paint_color_var.get(), "#ABCDEF")
+        self.assertEqual(editor.tool_mode.get(), "crop")
+        self.assertEqual(editor.eyedropper_target, "paint")
+
+    @unittest.skipIf(core.Image is None, "Pillow is not installed")
+    def test_eyedropper_rejects_fully_transparent_pixel(self) -> None:
+        editor = ImageCropWindow.__new__(ImageCropWindow)
+        editor.original = core.Image.new("RGBA", (1, 1), (12, 34, 56, 0))
+        editor.replace_source_var = FakeVar("#FFFFFF")
+        editor.eyedropper_target = "replace_source"
+        editor._to_pixel_point = lambda _event: (0, 0)
+
+        with patch("asset_browser.crop_window.messagebox.showinfo") as showinfo:
+            editor.pick_color_at_event(object())
+
+        self.assertEqual(editor.replace_source_var.get(), "#FFFFFF")
+        showinfo.assert_called_once()
 
     def test_transparency_checker_stays_larger_than_pixel_grid(self) -> None:
         self.assertEqual(checker_square_size(1.0), 8)

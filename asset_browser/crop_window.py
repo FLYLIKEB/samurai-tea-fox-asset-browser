@@ -198,6 +198,8 @@ class ImageCropWindow(tk.Toplevel):
         self.replace_source_var = tk.StringVar(value="#FFFFFF")
         self.paint_tolerance_var = tk.IntVar(value=0)
         self.transparency_background_var = tk.StringVar(value=TRANSPARENCY_BACKGROUNDS[0])
+        self.eyedropper_target = "paint"
+        self.eyedropper_return_tool: str | None = None
         self.edit_dirty = False
         self.last_changed_pixels = 0
         self.project_root = getattr(parent, "project_root", asset.path.parent)
@@ -259,6 +261,13 @@ class ImageCropWindow(tk.Toplevel):
             fg=MUTED,
             anchor="w",
         ).pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self._button(
+            context_bar,
+            "⌖",
+            self.use_eyedropper_tool,
+            width=3,
+            variant="secondary",
+        ).pack(side=tk.LEFT, padx=(4, 4))
         self._button(context_bar, "−", self.zoom_out, width=3, variant="ghost").pack(side=tk.LEFT, padx=(4, 1))
         tk.Label(
             context_bar,
@@ -362,7 +371,7 @@ class ImageCropWindow(tk.Toplevel):
         inspector_tabs.add(color_panel, text="색상")
         inspector_tabs.add(selection_panel, text="선택·저장")
 
-        self._section_label(color_panel, "현재 색")
+        self._section_label(color_panel, "결과색 · 페인트")
         color_row = tk.Frame(color_panel, bg=PANEL)
         color_row.pack(side=tk.TOP, fill=tk.X, pady=(0, 8))
         self.paint_color_swatch = tk.Label(
@@ -394,7 +403,7 @@ class ImageCropWindow(tk.Toplevel):
         palette_grid = tk.Frame(color_panel, bg=PANEL)
         palette_grid.pack(side=tk.TOP, fill=tk.X, pady=(0, 8))
         self._add_palette_chips(palette_grid)
-        tk.Label(color_panel, text="채우기 허용 범위", bg=PANEL, fg=MUTED, anchor="w").pack(
+        tk.Label(color_panel, text="색 허용 범위", bg=PANEL, fg=MUTED, anchor="w").pack(
             side=tk.TOP,
             fill=tk.X,
             pady=(6, 2),
@@ -419,16 +428,61 @@ class ImageCropWindow(tk.Toplevel):
         attach_tooltip(tolerance_scale, "채우기와 색 치환에서 비슷한 색으로 허용할 범위를 정합니다.")
         replace_row = tk.Frame(color_panel, bg=PANEL)
         replace_row.pack(side=tk.TOP, fill=tk.X, pady=(10, 0))
-        tk.Label(replace_row, text="치환할 색", bg=PANEL, fg=MUTED).pack(side=tk.LEFT)
-        tk.Entry(
+        tk.Label(
             replace_row,
+            text="치환할 원본색",
+            bg=PANEL,
+            fg=MUTED,
+            anchor="w",
+        ).pack(side=tk.TOP, fill=tk.X)
+        replace_controls = tk.Frame(replace_row, bg=PANEL)
+        replace_controls.pack(side=tk.TOP, fill=tk.X, pady=(4, 0))
+        self.replace_source_swatch = tk.Label(
+            replace_controls,
+            text="",
+            bg=self.replace_source_var.get(),
+            relief=tk.SOLID,
+            borderwidth=1,
+            width=3,
+            padx=2,
+            pady=7,
+            cursor="pointinghand",
+        )
+        self.replace_source_swatch.pack(side=tk.LEFT, padx=(0, 4))
+        self.replace_source_swatch.bind("<Button-1>", lambda _event: self.choose_replace_source_color())
+        attach_tooltip(self.replace_source_swatch, "클릭해 치환할 원본색을 색상 선택기로 고릅니다.")
+        replace_source_entry = tk.Entry(
+            replace_controls,
             textvariable=self.replace_source_var,
             bg=BG,
             fg=TEXT,
             relief=tk.FLAT,
             width=9,
-        ).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(5, 0))
-        self._button(color_panel, "↔ 선택 색으로 전체 치환", self.replace_all_colors).pack(
+        )
+        replace_source_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        replace_source_entry.bind(
+            "<Return>",
+            lambda _event: self.set_replace_source_color(self.replace_source_var.get()),
+        )
+        replace_source_entry.bind(
+            "<FocusOut>",
+            lambda _event: self.set_replace_source_color(self.replace_source_var.get()),
+        )
+        self._button(
+            replace_controls,
+            "색",
+            self.choose_replace_source_color,
+            width=3,
+            variant="ghost",
+        ).pack(side=tk.LEFT, padx=(3, 1))
+        self._button(
+            replace_controls,
+            "⌖",
+            self.use_replace_source_eyedropper,
+            width=3,
+            variant="secondary",
+        ).pack(side=tk.LEFT)
+        self._button(color_panel, "↔ 원본색 → 결과색 치환", self.replace_all_colors).pack(
             side=tk.TOP, fill=tk.X, pady=(4, 0)
         )
 
@@ -649,7 +703,11 @@ class ImageCropWindow(tk.Toplevel):
                 "eraser": "지우개: 픽셀 투명화",
                 "line": "직선: 시작점에서 끝점까지 드래그",
                 "paint": "채우기: 연결된 영역 채우기",
-                "eyedropper": "스포이드: 캔버스에서 색 추출",
+                "eyedropper": (
+                    "스포이드: 치환할 원본색을 캔버스에서 선택"
+                    if self.eyedropper_target == "replace_source"
+                    else "스포이드: 페인트 색을 캔버스에서 선택"
+                ),
                 "hand": "이동: 드래그로 캔버스 이동  (Space 임시 전환)",
             }.get(active_tool, "")
         )
@@ -995,6 +1053,19 @@ class ImageCropWindow(tk.Toplevel):
         return "break"
 
     def use_eyedropper_tool(self) -> str:
+        self.eyedropper_target = "paint"
+        self.eyedropper_return_tool = None
+        self.tool_mode.set("eyedropper")
+        self.clear_line_preview()
+        self._refresh_tool_buttons()
+        self._show_box_status()
+        return "break"
+
+    def use_replace_source_eyedropper(self) -> str:
+        self.eyedropper_target = "replace_source"
+        self.eyedropper_return_tool = (
+            self.tool_mode.get() if self.tool_mode.get() != "eyedropper" else "crop"
+        )
         self.tool_mode.set("eyedropper")
         self.clear_line_preview()
         self._refresh_tool_buttons()
@@ -1069,6 +1140,15 @@ class ImageCropWindow(tk.Toplevel):
             self.set_paint_color(hex_color)
         return "break"
 
+    def choose_replace_source_color(self) -> str:
+        _rgb, hex_color = colorchooser.askcolor(
+            color=self.replace_source_var.get(),
+            title="치환할 원본색 선택",
+        )
+        if hex_color:
+            self.set_replace_source_color(hex_color)
+        return "break"
+
     def set_paint_color(self, color: str) -> None:
         normalized = normalize_hex_color(color)
         if hex_to_rgb(normalized) is None:
@@ -1077,11 +1157,34 @@ class ImageCropWindow(tk.Toplevel):
         self.paint_color_swatch.configure(bg=normalized)
         self._show_box_status()
 
+    def set_replace_source_color(self, color: str) -> None:
+        normalized = normalize_hex_color(color)
+        if hex_to_rgb(normalized) is None:
+            return
+        self.replace_source_var.set(normalized)
+        self.replace_source_swatch.configure(bg=normalized)
+        self._show_box_status()
+
     def pick_color_at_event(self, event: tk.Event) -> str:
         point = self._to_pixel_point(event)
-        red, green, blue, _alpha = self.original.getpixel(point)
-        self.set_paint_color(self._rgb_to_hex((red, green, blue)))
-        self.tool_mode.set("paint")
+        red, green, blue, alpha = self.original.getpixel(point)
+        if alpha == 0:
+            messagebox.showinfo(
+                "투명 픽셀",
+                "완전히 투명한 영역에는 선택할 실색이 없습니다.\n그려진 픽셀을 선택하세요.",
+                parent=self,
+            )
+            return "break"
+
+        picked_color = self._rgb_to_hex((red, green, blue))
+        if self.eyedropper_target == "replace_source":
+            self.set_replace_source_color(picked_color)
+            self.tool_mode.set(self.eyedropper_return_tool or "crop")
+            self.eyedropper_target = "paint"
+            self.eyedropper_return_tool = None
+        else:
+            self.set_paint_color(picked_color)
+            self.tool_mode.set("paint")
         self._refresh_tool_buttons()
         self._show_box_status()
         return "break"
@@ -1222,10 +1325,21 @@ class ImageCropWindow(tk.Toplevel):
         return "break"
 
     def replace_all_colors(self) -> str:
-        source = hex_to_rgb(self.replace_source_var.get())
-        target = hex_to_rgb(self.paint_color_var.get())
+        source_text = normalize_hex_color(self.replace_source_var.get())
+        target_text = normalize_hex_color(self.paint_color_var.get())
+        source = hex_to_rgb(source_text)
+        target = hex_to_rgb(target_text)
         if source is None or target is None:
             messagebox.showerror("색상 오류", "치환할 색과 대상 색을 #RRGGBB 형식으로 입력하세요.")
+            return "break"
+        self.set_replace_source_color(source_text)
+        self.set_paint_color(target_text)
+        if source == target:
+            messagebox.showinfo(
+                "치환할 색이 같음",
+                "치환할 원본색과 결과색이 같습니다. 서로 다른 색을 선택하세요.",
+                parent=self,
+            )
             return "break"
         before = self.original.copy()
         replaced, changed = replace_color(
@@ -1240,6 +1354,13 @@ class ImageCropWindow(tk.Toplevel):
             self.original = replaced
             self.edit_dirty = True
             self._render_image()
+        else:
+            messagebox.showinfo(
+                "치환 결과 없음",
+                f"이미지에서 {source_text} 색을 찾지 못했습니다.\n"
+                "스포이드로 실제 그려진 픽셀을 다시 선택하거나 색 허용 범위를 높여보세요.",
+                parent=self,
+            )
         self._show_box_status()
         return "break"
 

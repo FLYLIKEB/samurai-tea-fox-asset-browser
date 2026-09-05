@@ -42,7 +42,7 @@
 
 ## Components
 - Existing components to reuse: `_button`, fixed grid cells, grouped headers, bottom panel tabs.
-- New/changed components: Main side action panels, 메인·상세 편집 공용 macOS 일관형 `ModernButton`, 모든 기능 버튼의 지연형 설명 툴팁, 선택 상태를 공유하는 image editor tool rail, 상단 문서·실행 취소·줌·투명 보기 바, `색상`/`선택·저장` 탭 인스펙터, 현재 스캔 경로의 상위 폴더 이동 버튼, `-100%`에서 `100%`까지 조정하는 보정 강도 슬라이더, 폴더·하위 폴더·이미지 크기 그룹을 별도로 여닫는 계층형 이미지 목록.
+- New/changed components: Main side action panels, 메인·상세 편집 공용 macOS 일관형 `ModernButton`, 모든 기능 버튼의 지연형 설명 툴팁, 선택 상태를 공유하는 image editor tool rail, 상단 즉시 스포이드·문서·실행 취소·줌·투명 보기 바, 결과색과 별도로 HEX·색상 선택기·전용 스포이드를 제공하는 `치환할 원본색` 행, `색상`/`선택·저장` 탭 인스펙터, 현재 스캔 경로의 상위 폴더 이동 버튼, `-100%`에서 `100%`까지 조정하는 보정 강도 슬라이더, 폴더·하위 폴더·이미지 크기 그룹을 별도로 여닫는 계층형 이미지 목록.
 - Variants and states: Selected tool, dirty edit status, undo/redo availability, zoom and painted-pixel-only grid state, `체커`·`밝게`·`어둡게` 투명 배경 보기, line preview, transparent/opaque asset badge. 완전히 투명한 픽셀에는 격자선을 표시하지 않는다.
 - Token/component ownership: `asset_browser/constants.py` owns colors; layout modules own placement.
 
@@ -61,7 +61,7 @@
 ## Interaction states
 - Loading: Status bar and empty grid message.
 - Empty: Grid shows Korean empty-state text.
-- Error: Dialogs for destructive or failed file actions; 미저장 편집창을 닫을 때 저장·폐기·취소를 선택한다.
+- Error: Dialogs for destructive or failed file actions; 미저장 편집창을 닫을 때 저장·폐기·취소를 선택한다. 색 치환에서 투명 픽셀을 스포이드로 찍거나 일치 픽셀이 0개이면 원인과 다음 행동을 안내한다.
 - Success: Status bar reports saved/copied/converted result. 기능 버튼에 포인터를 약 0.45초 올리면 화면 안쪽에 동작 설명과 단축키를 표시한다.
 - Disabled: Prefer no-op plus status/dialog over hidden actions.
 - Offline/slow network, if applicable: Not applicable.
