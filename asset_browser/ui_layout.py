@@ -7,6 +7,8 @@ from tkinter import ttk
 
 from .constants import (
     ADJUSTMENT_CHOICES,
+    ADJUSTMENT_PERCENT_MAX,
+    ADJUSTMENT_PERCENT_MIN,
     ART_STYLE_TOKENS_PATH,
     BG,
     BORDER,
@@ -55,7 +57,7 @@ class LayoutMixin:
         path_entry = tk.Entry(toolbar, textvariable=self.path_var, bg=BG, fg=TEXT, relief=tk.FLAT)
         path_entry.grid(row=0, column=0, sticky="ew", padx=(0, 6))
 
-        self._button(toolbar, "↑ 상위 (⌘↑)", self.navigate_to_parent_folder).grid(
+        self._button(toolbar, "↑ 상위 폴더 (⌘↑)", self.navigate_to_parent_folder).grid(
             row=0, column=1, padx=1
         )
         self._button(toolbar, "⌕ 찾기 (⌘O)", self.choose_root).grid(row=0, column=2, padx=1)
@@ -310,21 +312,27 @@ class LayoutMixin:
         adjustment_box.configure(bg=BG, fg=TEXT, activebackground=PANEL, relief=tk.FLAT, width=18)
         adjustment_box["menu"].configure(bg=BG, fg=TEXT)
         adjustment_box.pack(side=tk.TOP, fill=tk.X, pady=(0, 4))
-        adjustment_row = tk.Frame(adjust_group, bg=PANEL)
-        adjustment_row.pack(side=tk.TOP, fill=tk.X, pady=(0, 4))
-        adjustment_percent = tk.Spinbox(
-            adjustment_row,
-            from_=-100,
-            to=300,
-            textvariable=self.adjustment_percent_var,
-            width=5,
+        self.adjustment_scale = tk.Scale(
+            adjust_group,
+            from_=ADJUSTMENT_PERCENT_MIN,
+            to=ADJUSTMENT_PERCENT_MAX,
+            resolution=1,
+            orient=tk.HORIZONTAL,
+            variable=self.adjustment_percent_var,
+            showvalue=True,
+            tickinterval=50,
             bg=PANEL,
             fg=TEXT,
+            troughcolor=BG,
+            activebackground=PANEL,
             relief=tk.FLAT,
-            increment=5,
+            borderwidth=0,
+            highlightthickness=0,
+            sliderlength=16,
+            length=180,
+            label="보정 강도 (%)",
         )
-        adjustment_percent.pack(side=tk.LEFT, padx=(0, 3))
-        tk.Label(adjustment_row, text="%", bg=PANEL, fg=MUTED).pack(side=tk.LEFT)
+        self.adjustment_scale.pack(side=tk.TOP, fill=tk.X, pady=(0, 4))
         self._button(adjust_group, "◐ 적용 (⌘Y)", self.adjust_selected_images, width=11).pack(
             side=tk.TOP,
             fill=tk.X,

@@ -20,6 +20,8 @@ IMAGE_EXTENSIONS = {
 
 SCALE_CHOICES = (2, 3, 4, 5, 6, 8)
 ADJUSTMENT_CHOICES = ("대비", "밝기", "채도", "색조", "감마", "색상화", "선명도")
+ADJUSTMENT_PERCENT_MIN = -100
+ADJUSTMENT_PERCENT_MAX = 100
 RESIZE_CHOICES = (
     "32x32",
     "32x64",

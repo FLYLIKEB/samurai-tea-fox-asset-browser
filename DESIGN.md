@@ -41,7 +41,7 @@
 
 ## Components
 - Existing components to reuse: `_button`, fixed grid cells, grouped headers, bottom panel tabs.
-- New/changed components: Main side action panels, image editor tool rail, image editor inspector panel, 현재 스캔 경로의 상위 폴더 이동 버튼.
+- New/changed components: Main side action panels, image editor tool rail, image editor inspector panel, 현재 스캔 경로의 상위 폴더 이동 버튼, `-100%`에서 `100%`까지 조정하는 보정 강도 슬라이더.
 - Variants and states: Selected tool, dirty edit status, line preview, transparent/opaque asset badge.
 - Token/component ownership: `asset_browser/constants.py` owns colors; layout modules own placement.
 
