@@ -6,7 +6,15 @@ from pathlib import Path
 
 from asset_browser import asset_browser as core
 from asset_browser import ui_actions
-from asset_browser.crop_window import ImageCropWindow, next_zoom_scale
+from asset_browser.crop_window import (
+    CHECKER_DARK,
+    CHECKER_LIGHT,
+    ImageCropWindow,
+    checker_square_size,
+    composite_transparency_preview,
+    next_transparency_background,
+    next_zoom_scale,
+)
 
 class FakeVar:
     def __init__(self, value=None) -> None:
@@ -198,6 +206,29 @@ class AssetBrowserCoreTest(unittest.TestCase):
         self.assertEqual(next_zoom_scale(8.0, -1), 4.0)
         self.assertEqual(next_zoom_scale(32.0, 1), 32.0)
         self.assertEqual(next_zoom_scale(0.25, -1), 0.25)
+
+    def test_transparency_checker_stays_larger_than_pixel_grid(self) -> None:
+        self.assertEqual(checker_square_size(1.0), 8)
+        self.assertEqual(checker_square_size(8.0), 32)
+        self.assertEqual(checker_square_size(32.0), 128)
+
+    def test_transparency_background_cycles_between_contrast_modes(self) -> None:
+        self.assertEqual(next_transparency_background("체커"), "밝게")
+        self.assertEqual(next_transparency_background("밝게"), "어둡게")
+        self.assertEqual(next_transparency_background("어둡게"), "체커")
+        self.assertEqual(next_transparency_background("unknown"), "체커")
+
+    @unittest.skipIf(core.Image is None, "Pillow is not installed")
+    def test_transparency_preview_keeps_opaque_pixels_over_checker(self) -> None:
+        image = core.Image.new("RGBA", (2, 1), (0, 0, 0, 0))
+        image.putpixel((1, 0), (240, 20, 30, 255))
+
+        preview = composite_transparency_preview(image, (16, 8), 8.0, "체커")
+
+        expected_checker = core.Image.new("RGBA", (1, 1), CHECKER_LIGHT).getpixel((0, 0))
+        self.assertEqual(preview.getpixel((0, 0)), expected_checker)
+        self.assertEqual(preview.getpixel((9, 0)), (240, 20, 30, 255))
+        self.assertNotEqual(CHECKER_LIGHT, CHECKER_DARK)
 
     @unittest.skipIf(core.Image is None, "Pillow is not installed")
     def test_editor_undo_and_redo_restore_image_snapshots(self) -> None:

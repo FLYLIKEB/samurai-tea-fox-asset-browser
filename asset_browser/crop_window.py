@@ -35,8 +35,13 @@ ZOOM_LEVELS = (0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0, 32.0)
 KEY_ZOOM_LEVELS = (1.0, 2.0, 4.0, 8.0, 16.0, 32.0)
 CANVAS_MARGIN = 48
 EDITOR_BG = "#25262b"
-CHECKER_LIGHT = "#d7d7da"
-CHECKER_DARK = "#b9b9bd"
+CHECKER_LIGHT = "#90949d"
+CHECKER_DARK = "#686c75"
+TRANSPARENCY_BACKGROUNDS = ("체커", "밝게", "어둡게")
+SOLID_TRANSPARENCY_BACKGROUNDS = {
+    "밝게": "#f2f2f4",
+    "어둡게": "#34363c",
+}
 
 
 def next_zoom_scale(current: float, direction: int) -> float:
@@ -46,6 +51,51 @@ def next_zoom_scale(current: float, direction: int) -> float:
         (level for level in reversed(ZOOM_LEVELS) if level < current - 0.01),
         ZOOM_LEVELS[0],
     )
+
+
+def checker_square_size(scale: float) -> int:
+    """Keep transparency checks larger than the source-pixel grid."""
+    return max(8, int(round(scale * 4)))
+
+
+def next_transparency_background(current: str) -> str:
+    try:
+        index = TRANSPARENCY_BACKGROUNDS.index(current)
+    except ValueError:
+        return TRANSPARENCY_BACKGROUNDS[0]
+    return TRANSPARENCY_BACKGROUNDS[(index + 1) % len(TRANSPARENCY_BACKGROUNDS)]
+
+
+def composite_transparency_preview(
+    image,
+    display_size: tuple[int, int],
+    scale: float,
+    mode: str,
+):
+    """Render RGBA pixels over a clearly identifiable transparency background."""
+    resampling = getattr(Image, "Resampling", Image)
+    displayed = image.resize(display_size, resampling.NEAREST)
+    solid_color = SOLID_TRANSPARENCY_BACKGROUNDS.get(mode)
+    if solid_color is not None:
+        background = Image.new("RGBA", display_size, solid_color)
+    else:
+        background = Image.new("RGBA", display_size, CHECKER_LIGHT)
+        square_size = checker_square_size(scale)
+        for y in range(0, display_size[1], square_size):
+            for x in range(0, display_size[0], square_size):
+                if (x // square_size + y // square_size) % 2:
+                    background.paste(
+                        CHECKER_DARK,
+                        (
+                            x,
+                            y,
+                            min(x + square_size, display_size[0]),
+                            min(y + square_size, display_size[1]),
+                        ),
+                    )
+    background.alpha_composite(displayed)
+    return background
+
 
 class ImageCropWindow(tk.Toplevel):
     def __init__(self, parent: tk.Tk, asset: AssetImage, on_saved) -> None:
@@ -82,6 +132,7 @@ class ImageCropWindow(tk.Toplevel):
         self.paint_color_var = tk.StringVar(value="#2F6F73")
         self.replace_source_var = tk.StringVar(value="#FFFFFF")
         self.paint_tolerance_var = tk.IntVar(value=0)
+        self.transparency_background_var = tk.StringVar(value=TRANSPARENCY_BACKGROUNDS[0])
         self.edit_dirty = False
         self.last_changed_pixels = 0
         self.project_root = getattr(parent, "project_root", asset.path.parent)
@@ -151,6 +202,12 @@ class ImageCropWindow(tk.Toplevel):
             highlightbackground=SELECTED,
         )
         save_button.pack(side=tk.RIGHT)
+        self.background_button = self._button(
+            context_bar,
+            "▧ 투명 보기: 체커  D",
+            self.cycle_transparency_background,
+        )
+        self.background_button.pack(side=tk.RIGHT, padx=(4, 4))
 
         info = tk.Label(self, textvariable=self.info_var, bg=PANEL, fg=MUTED, anchor="w", padx=8, pady=4)
         info.pack(side=tk.BOTTOM, fill=tk.X)
@@ -373,6 +430,7 @@ class ImageCropWindow(tk.Toplevel):
             "x": self.fit_32,
             "c": self.clear_queued_boxes,
             "f": self.fit_to_window,
+            "d": self.cycle_transparency_background,
         }
         for sequence, command in canvas_shortcuts.items():
             self.bind(
@@ -595,19 +653,13 @@ class ImageCropWindow(tk.Toplevel):
             max(1, int(self.image_width * self.scale)),
             max(1, int(self.image_height * self.scale)),
         )
-        resampling = getattr(Image, "Resampling", Image)
-        displayed = self.original.resize(display_size, resampling.NEAREST)
-        checker = Image.new("RGBA", display_size, CHECKER_LIGHT)
-        checker_size = 8
-        for y in range(0, display_size[1], checker_size):
-            for x in range(0, display_size[0], checker_size):
-                if (x // checker_size + y // checker_size) % 2:
-                    checker.paste(
-                        CHECKER_DARK,
-                        (x, y, min(x + checker_size, display_size[0]), min(y + checker_size, display_size[1])),
-                    )
-        checker.alpha_composite(displayed)
-        self.preview_ref = ImageTk.PhotoImage(checker)
+        preview = composite_transparency_preview(
+            self.original,
+            display_size,
+            self.scale,
+            self.transparency_background_var.get(),
+        )
+        self.preview_ref = ImageTk.PhotoImage(preview)
 
         canvas_width = max(1, self.canvas.winfo_width())
         canvas_height = max(1, self.canvas.winfo_height())
@@ -630,6 +682,14 @@ class ImageCropWindow(tk.Toplevel):
         self._redraw_overlays()
         self._render_pixel_grid()
         self.zoom_var.set(f"{round(self.scale * 100)}%")
+
+    def cycle_transparency_background(self) -> str:
+        mode = next_transparency_background(self.transparency_background_var.get())
+        self.transparency_background_var.set(mode)
+        self.background_button.configure(text=f"▧ 투명 보기: {mode}  D")
+        self._render_image()
+        self._show_box_status()
+        return "break"
 
     def _to_original_point(self, event: tk.Event) -> tuple[int, int]:
         origin_x, origin_y = self.canvas_origin
@@ -848,7 +908,12 @@ class ImageCropWindow(tk.Toplevel):
             status = f"{status} | 편집 미저장"
         if self.last_changed_pixels:
             status = f"{status} | 변경 {self.last_changed_pixels}픽셀"
-        status = f"{status} | 도구: {self._tool_mode_label()} | 색: {self.paint_color_var.get()}"
+        transparency_mode = self.transparency_background_var.get()
+        transparency_help = " (무늬 부분은 투명)" if transparency_mode == "체커" else ""
+        status = (
+            f"{status} | 도구: {self._tool_mode_label()} | 색: {self.paint_color_var.get()}"
+            f" | 투명 보기: {transparency_mode}{transparency_help}"
+        )
         self.info_var.set(status)
         dirty_mark = "● " if self.edit_dirty else ""
         self.document_var.set(

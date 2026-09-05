@@ -33,7 +33,7 @@
 - Tradeoffs: Slightly more visible grouping is acceptable when it reduces accidental destructive edits.
 
 ## Visual language
-- Color: Mostly neutral app chrome with existing teal selection color. 상세 편집 캔버스는 어두운 작업 배경과 투명 체커를 사용해 스프라이트 경계를 분리한다.
+- Color: Mostly neutral app chrome with existing teal selection color. 상세 편집 캔버스는 어두운 작업 배경과 원본 픽셀보다 큰 중간 회색 투명 체커를 사용한다. 밝거나 어두운 스프라이트는 `체커`·`밝게`·`어둡게` 배경을 전환해 실재 픽셀 경계를 확인한다.
 - Typography: Tk default fonts, compact labels, Korean UI text.
 - Spacing/layout rhythm: Small fixed groups, stable cell sizes, no layout shift on selection. 32x32 에셋은 한 화면에 더 많이 보이도록 셀과 사이드바 여백을 최소화한다.
 - Shape/radius/elevation: Flat Tk controls, thin borders only where they clarify sections.
@@ -42,8 +42,8 @@
 
 ## Components
 - Existing components to reuse: `_button`, fixed grid cells, grouped headers, bottom panel tabs.
-- New/changed components: Main side action panels, image editor tool rail, 상단 문서·실행 취소·줌 바, `색상`/`선택·저장` 탭 인스펙터, 현재 스캔 경로의 상위 폴더 이동 버튼, `-100%`에서 `100%`까지 조정하는 보정 강도 슬라이더, 폴더·하위 폴더·이미지 크기 그룹을 별도로 여닫는 계층형 이미지 목록.
-- Variants and states: Selected tool, dirty edit status, undo/redo availability, zoom and pixel-grid state, line preview, transparent/opaque asset badge.
+- New/changed components: Main side action panels, image editor tool rail, 상단 문서·실행 취소·줌·투명 보기 바, `색상`/`선택·저장` 탭 인스펙터, 현재 스캔 경로의 상위 폴더 이동 버튼, `-100%`에서 `100%`까지 조정하는 보정 강도 슬라이더, 폴더·하위 폴더·이미지 크기 그룹을 별도로 여닫는 계층형 이미지 목록.
+- Variants and states: Selected tool, dirty edit status, undo/redo availability, zoom and pixel-grid state, `체커`·`밝게`·`어둡게` 투명 배경 보기, line preview, transparent/opaque asset badge.
 - Token/component ownership: `asset_browser/constants.py` owns colors; layout modules own placement.
 
 ## Accessibility
