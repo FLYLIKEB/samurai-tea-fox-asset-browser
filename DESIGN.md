@@ -22,7 +22,7 @@
 - Key contexts of use: Local macOS development, many 32x32 sprites, frequent keyboard shortcuts.
 
 ## Information architecture
-- Primary navigation: Scan path and filter at the top, selection/copy/file actions on the left, grouped asset grid in the center, image operations on the right, collapsible prompt/style panel at the bottom.
+- Primary navigation: Scan path and filter at the top, selection/copy/file actions on the left, 폴더와 하위 폴더를 단계별로 여닫는 이미지 트리를 중앙에 두고, image operations on the right, collapsible prompt/style panel at the bottom.
 - Core routes/screens: Main browser, image detail editor.
 - Content hierarchy: Assets first, file actions second, prompt/style metadata last.
 
@@ -41,7 +41,7 @@
 
 ## Components
 - Existing components to reuse: `_button`, fixed grid cells, grouped headers, bottom panel tabs.
-- New/changed components: Main side action panels, image editor tool rail, image editor inspector panel, 현재 스캔 경로의 상위 폴더 이동 버튼, `-100%`에서 `100%`까지 조정하는 보정 강도 슬라이더.
+- New/changed components: Main side action panels, image editor tool rail, image editor inspector panel, 현재 스캔 경로의 상위 폴더 이동 버튼, `-100%`에서 `100%`까지 조정하는 보정 강도 슬라이더, 폴더·하위 폴더·이미지 크기 그룹을 별도로 여닫는 계층형 이미지 목록.
 - Variants and states: Selected tool, dirty edit status, line preview, transparent/opaque asset badge.
 - Token/component ownership: `asset_browser/constants.py` owns colors; layout modules own placement.
 

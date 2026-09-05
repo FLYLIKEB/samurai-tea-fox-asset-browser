@@ -92,8 +92,12 @@ class AssetBrowserCoreTest(unittest.TestCase):
         browser.expanded_group_labels = set()
         browser.default_expanded_group_labels = set()
 
-        browser.current_group_labels()
+        browser.expanded_folder_labels = set()
+        browser.default_expanded_folder_labels = set()
 
+        browser.folder_groups_for_render()
+
+        self.assertIn("sprites", browser.expanded_folder_labels)
         self.assertIn("sprites / 32x32", browser.expanded_group_labels)
         self.assertNotIn("sprites / 대형/시트 (64x64 이상)", browser.expanded_group_labels)
 
@@ -109,12 +113,48 @@ class AssetBrowserCoreTest(unittest.TestCase):
         browser.image_size_by_path = {fox.path: (32, 32)}
         browser.expanded_group_labels = set()
         browser.default_expanded_group_labels = set()
+        browser.expanded_folder_labels = set()
+        browser.default_expanded_folder_labels = set()
 
-        browser.current_group_labels()
+        browser.folder_groups_for_render()
         browser.expanded_group_labels.remove("sprites / 32x32")
-        browser.current_group_labels()
+        browser.folder_groups_for_render()
 
         self.assertNotIn("sprites / 32x32", browser.expanded_group_labels)
+
+    def test_folder_groups_form_parent_child_hierarchy(self) -> None:
+        browser = core.AssetBrowser.__new__(core.AssetBrowser)
+        browser.project_root = Path("/project")
+        browser.asset_root = browser.project_root / "assets"
+        fox = core.AssetImage(
+            browser.asset_root / "sprites" / "fox.png",
+            Path("assets/sprites/fox.png"),
+        )
+        oni = core.AssetImage(
+            browser.asset_root / "sprites" / "enemies" / "oni.png",
+            Path("assets/sprites/enemies/oni.png"),
+        )
+        browser.filtered_images = [fox, oni]
+        browser.image_size_by_path = {fox.path: (32, 32), oni.path: (32, 64)}
+        browser.expanded_group_labels = set()
+        browser.default_expanded_group_labels = set()
+        browser.expanded_folder_labels = set()
+        browser.default_expanded_folder_labels = set()
+
+        folders = browser.folder_groups_for_render()
+
+        self.assertEqual([(folder.label, folder.depth) for folder in folders], [("sprites", 0), ("sprites/enemies", 1)])
+        self.assertEqual(len(folders[0].direct_images), 1)
+        self.assertEqual(len(folders[0].descendant_images), 2)
+        self.assertEqual(len(folders[1].direct_images), 1)
+
+    def test_child_folder_visibility_depends_on_expanded_parent(self) -> None:
+        browser = core.AssetBrowser.__new__(core.AssetBrowser)
+        browser.expanded_folder_labels = set()
+
+        self.assertFalse(browser.folder_group_is_visible("sprites/enemies"))
+        browser.expanded_folder_labels.add("sprites")
+        self.assertTrue(browser.folder_group_is_visible("sprites/enemies"))
 
     def test_rescan_reads_size_without_eager_transparency_decoding(self) -> None:
         browser = core.AssetBrowser.__new__(core.AssetBrowser)
@@ -283,6 +323,8 @@ class AssetBrowserCoreTest(unittest.TestCase):
         browser.project_root = Path("/project")
         browser.path_var = FakeVar("/project/assets/sprites")
         browser.filter_var = FakeVar("fox")
+        browser.expanded_folder_labels = {"sprites"}
+        browser.default_expanded_folder_labels = {"sprites"}
         browser.expanded_group_labels = {"sprites / 32x32"}
         browser.default_expanded_group_labels = {"sprites / 32x32"}
         browser.status_var = FakeVar("")
@@ -294,6 +336,8 @@ class AssetBrowserCoreTest(unittest.TestCase):
         self.assertEqual(result, "break")
         self.assertEqual(rescans, [Path("/project/assets/sprites/enemies")])
         self.assertEqual(browser.filter_var.get(), "")
+        self.assertEqual(browser.expanded_folder_labels, set())
+        self.assertEqual(browser.default_expanded_folder_labels, set())
         self.assertEqual(browser.expanded_group_labels, set())
         self.assertEqual(browser.default_expanded_group_labels, set())
         self.assertIn("/project/assets/sprites/enemies", browser.status_var.get())
@@ -303,6 +347,8 @@ class AssetBrowserCoreTest(unittest.TestCase):
         browser.project_root = Path("/project")
         browser.path_var = FakeVar("/project/assets/sprites/enemies")
         browser.filter_var = FakeVar("oni")
+        browser.expanded_folder_labels = {"enemies"}
+        browser.default_expanded_folder_labels = {"enemies"}
         browser.expanded_group_labels = {"enemies / 32x32"}
         browser.default_expanded_group_labels = {"enemies / 32x32"}
         browser.status_var = FakeVar("")

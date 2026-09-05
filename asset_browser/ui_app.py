@@ -40,6 +40,17 @@ class AssetCellWidgets:
     transparency_label: tk.Label
     preview_error: bool
 
+
+@dataclass
+class AssetFolderGroup:
+    label: str
+    name: str
+    depth: int
+    path: Path
+    direct_images: list[AssetImage]
+    descendant_images: list[AssetImage]
+
+
 class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
     def __init__(self, project_root: Path, asset_root: Path, scale: int) -> None:
         super().__init__()
@@ -85,6 +96,8 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         self.drag_seen_paths: set[Path] = set()
         self.expanded_group_labels: set[str] = set()
         self.default_expanded_group_labels: set[str] = set()
+        self.expanded_folder_labels: set[str] = set()
+        self.default_expanded_folder_labels: set[str] = set()
 
         self.title("무사여우 에셋 브라우저")
         self.geometry("1360x940")
@@ -119,35 +132,53 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
             return
 
         width = max(self.canvas.winfo_width(), 360)
-        groups = self.grouped_images_for_render()
+        folders = self.folder_groups_for_render()
 
         max_columns = max(1, width // GRID_CELL_PITCH)
         for column in range(max_columns):
             self.grid_frame.columnconfigure(column, minsize=GRID_CELL_PITCH, uniform="asset_cells")
 
         row = 0
-        for label, images in groups:
-            expanded = label in self.expanded_group_labels
-            group_preview_size = self.preview_size_for_group(images)
-            group_cell_width, _group_cell_height = cell_size_for_preview(group_preview_size)
-            group_pitch = group_cell_width + 8
-            columns = max(1, width // group_pitch)
-            self._add_group_header(label, images, row, columns, expanded)
-            row += 1
-            if not expanded:
+        for folder in folders:
+            if not self.folder_group_is_visible(folder.label):
                 continue
-            for index, item in enumerate(images):
-                cell_row = row + index // columns
-                column = index % columns
-                self._add_cell(item, cell_row, column)
-            row += math.ceil(len(images) / columns)
+
+            folder_expanded = folder.label in self.expanded_folder_labels
+            self._add_folder_header(folder, row, max_columns, folder_expanded)
+            row += 1
+            if not folder_expanded:
+                continue
+
+            for label, images in self.size_groups_for_folder(folder):
+                expanded = label in self.expanded_group_labels
+                group_preview_size = self.preview_size_for_group(images)
+                group_cell_width, _group_cell_height = cell_size_for_preview(group_preview_size)
+                group_pitch = group_cell_width + 8
+                columns = max(1, width // group_pitch)
+                size_label = label.rsplit(" / ", 1)[-1]
+                self._add_size_group_header(
+                    label,
+                    size_label,
+                    images,
+                    row,
+                    columns,
+                    folder.depth + 1,
+                    expanded,
+                )
+                row += 1
+                if not expanded:
+                    continue
+                for index, item in enumerate(images):
+                    cell_row = row + index // columns
+                    column = index % columns
+                    self._add_cell(item, cell_row, column)
+                row += math.ceil(len(images) / columns)
 
         self._set_status()
 
-    def _add_group_header(
+    def _add_folder_header(
         self,
-        label: str,
-        images: list[AssetImage],
+        folder: AssetFolderGroup,
         row: int,
         columns: int,
         expanded: bool,
@@ -160,13 +191,13 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
             highlightthickness=1,
             highlightbackground=BORDER,
         )
-        header.grid(row=row, column=0, columnspan=columns, sticky="ew", padx=2, pady=(6, 1))
+        indent = 2 + folder.depth * 16
+        header.grid(row=row, column=0, columnspan=columns, sticky="ew", padx=(indent, 2), pady=(5, 1))
 
         icon = "▾" if expanded else "▸"
-        transparency_summary = self.transparency_summary(images)
         title = tk.Label(
             header,
-            text=f"{icon} {label}",
+            text=f"{icon} 폴더  {folder.name}",
             bg=PANEL,
             fg=TEXT,
             anchor="w",
@@ -174,13 +205,60 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
             cursor="pointinghand",
         )
         title.pack(side=tk.LEFT)
-        folder = self.folder_path_for_group(images)
-        if folder is not None:
-            self._button(
-                header,
-                "↪ 폴더",
-                lambda target=folder: self.navigate_to_asset_folder(target),
-            ).pack(side=tk.LEFT, padx=(6, 0))
+        self._button(
+            header,
+            "↪ 이 폴더만 보기",
+            lambda target=folder.path: self.navigate_to_asset_folder(target),
+        ).pack(side=tk.LEFT, padx=(6, 0))
+        summary = tk.Label(
+            header,
+            text=f"하위 포함 {len(folder.descendant_images)}개",
+            bg=PANEL,
+            fg=MUTED,
+            anchor="e",
+            font=("TkDefaultFont", 9),
+            cursor="pointinghand",
+        )
+        summary.pack(side=tk.RIGHT)
+        for widget in (header, title, summary):
+            widget.bind(
+                "<Button-1>",
+                lambda _event, folder_label=folder.label: self.toggle_folder(folder_label),
+            )
+
+    def _add_size_group_header(
+        self,
+        group_label: str,
+        size_label: str,
+        images: list[AssetImage],
+        row: int,
+        columns: int,
+        depth: int,
+        expanded: bool,
+    ) -> None:
+        header = tk.Frame(
+            self.grid_frame,
+            bg=PANEL,
+            padx=6,
+            pady=3,
+            highlightthickness=1,
+            highlightbackground=BORDER,
+        )
+        indent = 2 + depth * 16
+        header.grid(row=row, column=0, columnspan=columns, sticky="ew", padx=(indent, 2), pady=(2, 1))
+
+        icon = "▾" if expanded else "▸"
+        transparency_summary = self.transparency_summary(images)
+        title = tk.Label(
+            header,
+            text=f"{icon} 크기  {size_label}",
+            bg=PANEL,
+            fg=TEXT,
+            anchor="w",
+            font=("TkDefaultFont", 10, "bold"),
+            cursor="pointinghand",
+        )
+        title.pack(side=tk.LEFT)
         summary = tk.Label(
             header,
             text=f"{len(images)}개 | {transparency_summary}",
@@ -192,7 +270,10 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         )
         summary.pack(side=tk.RIGHT)
         for widget in (header, title, summary):
-            widget.bind("<Button-1>", lambda _event, group_label=label: self.toggle_group(group_label))
+            widget.bind(
+                "<Button-1>",
+                lambda _event, label=group_label: self.toggle_group(label),
+            )
 
     def folder_path_for_group(self, images: list[AssetImage]) -> Path | None:
         if not images:
@@ -201,6 +282,69 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
 
     def current_group_labels(self) -> list[str]:
         return [label for label, _images in self.grouped_images_for_render()]
+
+    def current_folder_labels(self) -> list[str]:
+        return [folder.label for folder in self.folder_groups_for_render()]
+
+    def folder_groups_for_render(self) -> list[AssetFolderGroup]:
+        folders: dict[str, AssetFolderGroup] = {}
+        for image in self.filtered_images:
+            folder_label = folder_group_label(image, self.asset_root, self.project_root)
+            if folder_label == "(현재 폴더)":
+                ancestor_labels = [folder_label]
+            else:
+                parts = folder_label.split("/")
+                ancestor_labels = ["/".join(parts[:index]) for index in range(1, len(parts) + 1)]
+
+            for depth, ancestor_label in enumerate(ancestor_labels):
+                if ancestor_label == "(현재 폴더)":
+                    folder_path = self.asset_root
+                    name = ancestor_label
+                else:
+                    folder_path = self.asset_root.joinpath(*ancestor_label.split("/"))
+                    name = ancestor_label.rsplit("/", 1)[-1]
+                folder = folders.setdefault(
+                    ancestor_label,
+                    AssetFolderGroup(
+                        label=ancestor_label,
+                        name=name,
+                        depth=depth,
+                        path=folder_path,
+                        direct_images=[],
+                        descendant_images=[],
+                    ),
+                )
+                folder.descendant_images.append(image)
+
+            folders[folder_label].direct_images.append(image)
+
+        ordered = sorted(folders.values(), key=self.folder_group_sort_key)
+        self.expand_default_tree(ordered)
+        return ordered
+
+    @staticmethod
+    def folder_group_sort_key(folder: AssetFolderGroup) -> tuple[int, tuple[str, ...]]:
+        if folder.label == "(현재 폴더)":
+            return 0, ()
+        return 1, tuple(part.lower() for part in folder.label.split("/"))
+
+    def folder_group_is_visible(self, label: str) -> bool:
+        if label == "(현재 폴더)":
+            return True
+        parts = label.split("/")
+        ancestors = ["/".join(parts[:index]) for index in range(1, len(parts))]
+        return all(ancestor in self.expanded_folder_labels for ancestor in ancestors)
+
+    def size_groups_for_folder(self, folder: AssetFolderGroup) -> list[tuple[str, list[AssetImage]]]:
+        groups: dict[str, list[AssetImage]] = {}
+        sort_keys: dict[str, tuple[int, int, int]] = {}
+        for image in folder.direct_images:
+            size = self.image_size_by_path.get(image.path)
+            size_label = tile_size_group_label(size)
+            label = f"{folder.label} / {size_label}"
+            groups.setdefault(label, []).append(image)
+            sort_keys.setdefault(label, tile_size_sort_key(size))
+        return sorted(groups.items(), key=lambda item: sort_keys[item[0]])
 
     def grouped_images_for_render(self) -> list[tuple[str, list[AssetImage]]]:
         groups: dict[str, list[AssetImage]] = {}
@@ -212,7 +356,6 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
             groups.setdefault(label, []).append(image)
             sort_keys.setdefault(label, (folder_label.lower(), *tile_size_sort_key(size)))
 
-        self.expand_default_groups(groups)
         return sorted(groups.items(), key=lambda item: sort_keys[item[0]])
 
     def group_parts_for_asset(self, image: AssetImage) -> tuple[str, str]:
@@ -226,17 +369,31 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         folder_label, size_label = self.group_parts_for_asset(image)
         return f"{folder_label} / {size_label}"
 
-    def expand_default_groups(self, groups: dict[str, list[AssetImage]]) -> None:
-        # Keep one initial group open so the grid has actual scrollable image
-        # content. Opening every 32x32 group was the expensive behavior; the
-        # existing toolbar can still deliberately expand all groups.
+    def expand_default_tree(self, folders: list[AssetFolderGroup]) -> None:
+        default_folders = getattr(self, "default_expanded_folder_labels", set())
         default_expanded = getattr(self, "default_expanded_group_labels", set())
+        self.default_expanded_folder_labels = default_folders
         self.default_expanded_group_labels = default_expanded
-        if default_expanded or not groups:
+        if default_folders or default_expanded or not folders:
             return
-        first_label = next(iter(groups))
-        default_expanded.add(first_label)
-        self.expanded_group_labels.add(first_label)
+
+        first_folder = next((folder for folder in folders if folder.direct_images), None)
+        if first_folder is None:
+            return
+
+        if first_folder.label == "(현재 폴더)":
+            folder_labels = [first_folder.label]
+        else:
+            parts = first_folder.label.split("/")
+            folder_labels = ["/".join(parts[:index]) for index in range(1, len(parts) + 1)]
+        default_folders.update(folder_labels)
+        self.expanded_folder_labels.update(folder_labels)
+
+        size_groups = self.size_groups_for_folder(first_folder)
+        if size_groups:
+            first_group_label = size_groups[0][0]
+            default_expanded.add(first_group_label)
+            self.expanded_group_labels.add(first_group_label)
 
     def preview_size_for_group(self, images: list[AssetImage]) -> tuple[int, int]:
         if not images:
@@ -262,6 +419,14 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
             self.expanded_group_labels.remove(label)
         else:
             self.expanded_group_labels.add(label)
+        self.render_grid()
+        return "break"
+
+    def toggle_folder(self, label: str) -> str:
+        if label in self.expanded_folder_labels:
+            self.expanded_folder_labels.remove(label)
+        else:
+            self.expanded_folder_labels.add(label)
         self.render_grid()
         return "break"
 

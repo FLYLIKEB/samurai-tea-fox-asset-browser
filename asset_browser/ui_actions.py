@@ -148,14 +148,16 @@ class ActionsMixin:
             self._set_status()
 
     def expand_all_groups(self) -> None:
+        self.expanded_folder_labels.update(self.current_folder_labels())
         self.expanded_group_labels.update(self.current_group_labels())
         self.render_grid()
-        self.status_var.set("모든 폴더를 펼쳤습니다.")
+        self.status_var.set("모든 폴더와 크기 그룹을 펼쳤습니다.")
 
     def collapse_all_groups(self) -> None:
+        self.expanded_folder_labels.clear()
         self.expanded_group_labels.clear()
         self.render_grid()
-        self.status_var.set("모든 폴더를 접었습니다.")
+        self.status_var.set("모든 폴더와 크기 그룹을 접었습니다.")
 
     def navigate_to_asset_folder(self, folder: Path) -> str:
         target = folder.expanduser()
@@ -163,6 +165,8 @@ class ActionsMixin:
             target = (self.project_root / target).resolve()
         self.path_var.set(str(target))
         self.filter_var.set("")
+        self.expanded_folder_labels.clear()
+        self.default_expanded_folder_labels.clear()
         self.expanded_group_labels.clear()
         self.default_expanded_group_labels.clear()
         self.rescan()
