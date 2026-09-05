@@ -406,6 +406,34 @@ class AssetBrowserCoreTest(unittest.TestCase):
         self.assertEqual(core.wheel_scroll_units(-120, 0.0), (1, 0.0))
         self.assertEqual(core.wheel_scroll_units(120, 0.0), (-1, 0.0))
 
+    def test_mousewheel_ignores_widgets_outside_the_asset_grid(self) -> None:
+        browser = core.AssetBrowser.__new__(core.AssetBrowser)
+        calls: list[tuple[int, str]] = []
+        browser.canvas = object()
+        browser.scroll_remainder = 0.0
+        browser.drag_selecting = False
+        browser.scroll_select_var = FakeVar(False)
+        browser.after_idle = lambda *_args: self.fail("outside wheel must not schedule grid selection")
+        event = type("Event", (), {"widget": object(), "num": None, "delta": -1, "state": 0})()
+
+        self.assertEqual(browser._on_mousewheel(event), "")
+        self.assertEqual(calls, [])
+
+    def test_mousewheel_scrolls_asset_grid_children_by_three_units(self) -> None:
+        browser = core.AssetBrowser.__new__(core.AssetBrowser)
+        calls: list[tuple[int, str]] = []
+        canvas = type("Canvas", (), {"yview_scroll": lambda _self, units, kind: calls.append((units, kind))})()
+        child = type("Child", (), {"master": canvas})()
+        browser.canvas = canvas
+        browser.scroll_remainder = 0.0
+        browser.drag_selecting = False
+        browser.scroll_select_var = FakeVar(False)
+        browser.after_idle = lambda *_args: self.fail("ordinary scrolling must not select assets")
+        event = type("Event", (), {"widget": child, "num": None, "delta": -1, "state": 0})()
+
+        self.assertEqual(browser._on_mousewheel(event), "break")
+        self.assertEqual(calls, [(3, "units")])
+
     def test_render_prompt_template_replaces_known_placeholders(self) -> None:
         prompt = core.render_prompt_template(
             "개수: {asset_count}\n루트: {project_root}\n이미지:\n{asset_list}",

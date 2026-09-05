@@ -573,6 +573,9 @@ class LayoutMixin:
         self.render_grid()
 
     def _on_mousewheel(self, event: tk.Event) -> str:
+        if not self._event_targets_asset_grid(event):
+            return ""
+
         event_num = getattr(event, "num", None)
         if event_num == 4:
             units = -1
@@ -582,10 +585,18 @@ class LayoutMixin:
             units, self.scroll_remainder = wheel_scroll_units(int(event.delta), self.scroll_remainder)
 
         if units:
-            self.canvas.yview_scroll(units, "units")
+            self.canvas.yview_scroll(units * 3, "units")
             if self.drag_selecting or self.scroll_select_var.get() or getattr(event, "state", 0) & 0x0001:
                 self.after_idle(self.select_visible_images)
         return "break"
+
+    def _event_targets_asset_grid(self, event: tk.Event) -> bool:
+        widget = event.widget
+        while widget is not None:
+            if widget is self.canvas:
+                return True
+            widget = getattr(widget, "master", None)
+        return False
 
     def autoscroll_during_drag(self, event: tk.Event) -> None:
         canvas_top = self.canvas.winfo_rooty()
