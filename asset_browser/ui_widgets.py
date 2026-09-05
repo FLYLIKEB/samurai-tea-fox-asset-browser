@@ -13,6 +13,8 @@ ACCENT_HOVER = "#125b58"
 DANGER_BG = "#f9eceb"
 DANGER_HOVER = "#f3ddda"
 DANGER_TEXT = "#93443d"
+SELECTED_BG = "#dcebea"
+SELECTED_HOVER = "#cfe2e0"
 TOOLTIP_BG = "#20262d"
 TOOLTIP_TEXT = "#ffffff"
 
@@ -155,14 +157,18 @@ class ModernButton(tk.Label):
         command,
         *,
         width: int | None = None,
+        height: int | None = None,
         variant: str = "secondary",
         anchor: str = "center",
     ) -> None:
         self.command = command
         self.variant = variant
         self._state = tk.NORMAL
+        self._selected = False
         self.base_bg = self._variant_color("bg", parent.cget("bg"))
         options = {"width": width} if width is not None else {}
+        if height is not None:
+            options["height"] = height
         super().__init__(
             parent,
             text=text,
@@ -195,10 +201,23 @@ class ModernButton(tk.Label):
 
     def _enter(self, _event=None) -> None:
         if self._state != tk.DISABLED:
-            self.configure(bg=self._variant_color("hover", self.master.cget("bg")))
+            hover_bg = (
+                SELECTED_HOVER
+                if self._selected
+                else self._variant_color("hover", self.master.cget("bg"))
+            )
+            self.configure(bg=hover_bg)
 
     def _leave(self, _event=None) -> None:
-        self.configure(bg=self.base_bg)
+        self.configure(bg=SELECTED_BG if self._selected else self.base_bg)
+
+    def set_selected(self, selected: bool) -> None:
+        self._selected = selected
+        self.configure(
+            bg=SELECTED_BG if selected else self.base_bg,
+            fg=SELECTED if selected else self._variant_color("fg", TEXT),
+            highlightbackground=SELECTED if selected else self.base_bg,
+        )
 
     def _invoke(self, _event=None):
         if self._state != tk.DISABLED:
@@ -216,7 +235,8 @@ class ModernButton(tk.Label):
         state = kwargs.pop("state", None)
         if state is not None:
             self._state = state
-            kwargs.setdefault("fg", MUTED if state == tk.DISABLED else self._variant_color("fg", TEXT))
+            normal_fg = SELECTED if self._selected else self._variant_color("fg", TEXT)
+            kwargs.setdefault("fg", MUTED if state == tk.DISABLED else normal_fg)
             kwargs.setdefault("cursor", "arrow" if state == tk.DISABLED else "pointinghand")
         return super().configure(**kwargs)
 

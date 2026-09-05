@@ -32,7 +32,7 @@ from .models import AssetImage
 from .paths import paint_backup_root, relative_or_name
 from .style_tokens import extract_palette_colors, hex_to_rgb, normalize_hex_color
 from .ui_layout import touchpad_scroll_deltas
-from .ui_widgets import attach_tooltip, tooltip_for_command
+from .ui_widgets import ModernButton, attach_tooltip, tooltip_for_command
 
 MAX_INITIAL_WIDTH = 980
 MAX_INITIAL_HEIGHT = 620
@@ -183,7 +183,7 @@ class ImageCropWindow(tk.Toplevel):
         self.preview_ref: tk.PhotoImage | None = None
         self.rect_id: int | None = None
         self.queued_rect_ids: list[int] = []
-        self.tool_buttons: dict[str, tk.Button] = {}
+        self.tool_buttons: dict[str, ModernButton] = {}
         self.last_draw_point: tuple[int, int] | None = None
         self.line_start: tuple[int, int] | None = None
         self.line_preview_id: int | None = None
@@ -225,7 +225,18 @@ class ImageCropWindow(tk.Toplevel):
         self.focus_set()
 
     def _build_ui(self) -> None:
-        top_bar = tk.Frame(self, bg=PANEL, padx=8, pady=4)
+        style = ttk.Style(self)
+        style.configure("TNotebook", background=PANEL, borderwidth=0, tabmargins=(0, 0, 0, 0))
+        style.configure("TNotebook.Tab", padding=(14, 7), font=("TkDefaultFont", 10))
+
+        top_bar = tk.Frame(
+            self,
+            bg=PANEL,
+            padx=12,
+            pady=7,
+            highlightthickness=1,
+            highlightbackground=BORDER,
+        )
         top_bar.pack(side=tk.TOP, fill=tk.X)
         tk.Label(
             top_bar,
@@ -235,49 +246,55 @@ class ImageCropWindow(tk.Toplevel):
             anchor="w",
         ).pack(side=tk.LEFT, fill=tk.X, expand=True)
 
-        context_bar = tk.Frame(self, bg=BG, padx=8, pady=4)
+        context_bar = tk.Frame(self, bg=PANEL, padx=10, pady=6)
         context_bar.pack(side=tk.TOP, fill=tk.X)
-        self.undo_button = self._button(context_bar, "↶ 되돌리기  ⌘Z", self.undo)
+        self.undo_button = self._button(context_bar, "↶ 되돌리기", self.undo, variant="ghost")
         self.undo_button.pack(side=tk.LEFT, padx=(0, 2))
-        self.redo_button = self._button(context_bar, "↷ 다시 실행  ⇧⌘Z", self.redo)
+        self.redo_button = self._button(context_bar, "↷ 다시 실행", self.redo, variant="ghost")
         self.redo_button.pack(side=tk.LEFT, padx=(0, 8))
         tk.Label(
             context_bar,
             textvariable=self.tool_hint_var,
-            bg=BG,
+            bg=PANEL,
             fg=MUTED,
             anchor="w",
         ).pack(side=tk.LEFT, fill=tk.X, expand=True)
-        self._button(context_bar, "−", self.zoom_out, width=3).pack(side=tk.LEFT, padx=(4, 1))
+        self._button(context_bar, "−", self.zoom_out, width=3, variant="ghost").pack(side=tk.LEFT, padx=(4, 1))
         tk.Label(
             context_bar,
             textvariable=self.zoom_var,
-            bg=PANEL,
+            bg=BG,
             fg=TEXT,
             width=7,
             padx=3,
             pady=3,
         ).pack(side=tk.LEFT)
-        self._button(context_bar, "+", self.zoom_in, width=3).pack(side=tk.LEFT, padx=1)
-        self._button(context_bar, "맞춤  F", self.fit_to_window).pack(side=tk.LEFT, padx=(1, 8))
-        save_button = self._button(context_bar, "원본 저장  ⌘S", self.save_edited_image)
-        save_button.configure(
-            fg=SELECTED,
-            highlightthickness=1,
-            highlightbackground=SELECTED,
-        )
+        self._button(context_bar, "+", self.zoom_in, width=3, variant="ghost").pack(side=tk.LEFT, padx=1)
+        self._button(context_bar, "화면 맞춤", self.fit_to_window, variant="ghost").pack(side=tk.LEFT, padx=(1, 8))
+        save_button = self._button(context_bar, "원본 저장", self.save_edited_image, variant="accent")
         save_button.pack(side=tk.RIGHT)
         self.background_button = self._button(
             context_bar,
-            "▧ 투명 보기: 체커  D",
+            "▧ 투명 보기: 체커",
             self.cycle_transparency_background,
+            variant="secondary",
         )
         self.background_button.pack(side=tk.RIGHT, padx=(4, 4))
 
-        info = tk.Label(self, textvariable=self.info_var, bg=PANEL, fg=MUTED, anchor="w", padx=8, pady=4)
+        info = tk.Label(
+            self,
+            textvariable=self.info_var,
+            bg=PANEL,
+            fg=MUTED,
+            anchor="w",
+            padx=10,
+            pady=6,
+            highlightthickness=1,
+            highlightbackground=BORDER,
+        )
         info.pack(side=tk.BOTTOM, fill=tk.X)
 
-        editor = tk.Frame(self, bg=BG)
+        editor = tk.Frame(self, bg=BG, padx=8, pady=8)
         editor.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
         editor.columnconfigure(1, weight=1)
         editor.rowconfigure(0, weight=1)
@@ -285,29 +302,29 @@ class ImageCropWindow(tk.Toplevel):
         tool_rail = tk.Frame(
             editor,
             bg=PANEL,
-            padx=5,
-            pady=6,
+            padx=6,
+            pady=7,
             highlightthickness=1,
             highlightbackground=BORDER,
         )
-        tool_rail.grid(row=0, column=0, sticky="ns", padx=(6, 3), pady=6)
-        self.tool_buttons["crop"] = self._tool_button(tool_rail, "✂\n선택 M", self.use_crop_tool)
-        self.tool_buttons["pencil"] = self._tool_button(tool_rail, "✎\n펜 B", self.use_pencil_tool)
-        self.tool_buttons["eraser"] = self._tool_button(tool_rail, "⌫\n지우개 E", self.use_eraser_tool)
-        self.tool_buttons["line"] = self._tool_button(tool_rail, "╱\n직선 L", self.use_line_tool)
-        self.tool_buttons["paint"] = self._tool_button(tool_rail, "▣\n채우기 G", self.use_paint_tool)
+        tool_rail.grid(row=0, column=0, sticky="ns", padx=(0, 4))
+        self.tool_buttons["crop"] = self._tool_button(tool_rail, "✂\n선택", self.use_crop_tool)
+        self.tool_buttons["pencil"] = self._tool_button(tool_rail, "✎\n펜", self.use_pencil_tool)
+        self.tool_buttons["eraser"] = self._tool_button(tool_rail, "⌫\n지우개", self.use_eraser_tool)
+        self.tool_buttons["line"] = self._tool_button(tool_rail, "╱\n직선", self.use_line_tool)
+        self.tool_buttons["paint"] = self._tool_button(tool_rail, "▣\n채우기", self.use_paint_tool)
         self.tool_buttons["eyedropper"] = self._tool_button(
             tool_rail,
-            "⌖\n스포이드 I",
+            "⌖\n스포이드",
             self.use_eyedropper_tool,
         )
-        self.tool_buttons["hand"] = self._tool_button(tool_rail, "✋\n이동 H", self.use_hand_tool)
+        self.tool_buttons["hand"] = self._tool_button(tool_rail, "✋\n이동", self.use_hand_tool)
         self._tool_spacer(tool_rail)
-        self._tool_button(tool_rail, "◫\n외곽 투명 T", self.apply_transparency)
-        self._tool_button(tool_rail, "×\n영역 비우기 C", self.clear_queued_boxes)
+        self._tool_button(tool_rail, "◫\n외곽 투명", self.apply_transparency)
+        self._tool_button(tool_rail, "×\n영역 비우기", self.clear_queued_boxes)
 
         canvas_shell = tk.Frame(editor, bg=BG)
-        canvas_shell.grid(row=0, column=1, sticky="nsew", padx=3, pady=6)
+        canvas_shell.grid(row=0, column=1, sticky="nsew", padx=4)
 
         self.canvas = tk.Canvas(
             canvas_shell,
@@ -335,7 +352,7 @@ class ImageCropWindow(tk.Toplevel):
             highlightbackground=BORDER,
             width=242,
         )
-        inspector.grid(row=0, column=2, sticky="ns", padx=(3, 6), pady=6)
+        inspector.grid(row=0, column=2, sticky="ns", padx=(4, 0))
         inspector.grid_propagate(False)
 
         inspector_tabs = ttk.Notebook(inspector)
@@ -361,6 +378,7 @@ class ImageCropWindow(tk.Toplevel):
         )
         self.paint_color_swatch.pack(side=tk.LEFT, padx=(0, 5))
         self.paint_color_swatch.bind("<Button-1>", lambda _event: self.choose_paint_color())
+        attach_tooltip(self.paint_color_swatch, "현재 페인트 색을 색상 선택기로 바꿉니다.")
         paint_color_entry = tk.Entry(
             color_row,
             textvariable=self.paint_color_var,
@@ -381,7 +399,7 @@ class ImageCropWindow(tk.Toplevel):
             fill=tk.X,
             pady=(6, 2),
         )
-        tk.Scale(
+        tolerance_scale = tk.Scale(
             color_panel,
             from_=0,
             to=255,
@@ -396,7 +414,9 @@ class ImageCropWindow(tk.Toplevel):
             borderwidth=0,
             highlightthickness=0,
             sliderlength=16,
-        ).pack(side=tk.TOP, fill=tk.X)
+        )
+        tolerance_scale.pack(side=tk.TOP, fill=tk.X)
+        attach_tooltip(tolerance_scale, "채우기와 색 치환에서 비슷한 색으로 허용할 범위를 정합니다.")
         replace_row = tk.Frame(color_panel, bg=PANEL)
         replace_row.pack(side=tk.TOP, fill=tk.X, pady=(10, 0))
         tk.Label(replace_row, text="치환할 색", bg=PANEL, fg=MUTED).pack(side=tk.LEFT)
@@ -423,28 +443,28 @@ class ImageCropWindow(tk.Toplevel):
             padx=6,
             pady=6,
         ).pack(side=tk.TOP, fill=tk.X, pady=(0, 6))
-        self._button(selection_panel, "□ 32x32로 맞춤  X", self.fit_32).pack(
+        self._button(selection_panel, "□ 32x32로 맞춤", self.fit_32).pack(
             side=tk.TOP,
             fill=tk.X,
             pady=(0, 4),
         )
-        self._button(selection_panel, "+ 대기 영역에 추가  Q", self.queue_current_box).pack(
+        self._button(selection_panel, "+ 대기 영역에 추가", self.queue_current_box).pack(
             side=tk.TOP,
             fill=tk.X,
             pady=(0, 4),
         )
-        self._button(selection_panel, "× 대기 영역 비우기  C", self.clear_queued_boxes).pack(
+        self._button(selection_panel, "× 대기 영역 비우기", self.clear_queued_boxes).pack(
             side=tk.TOP,
             fill=tk.X,
         )
 
         self._section_label(selection_panel, "내보내기", pady=(16, 4))
-        self._button(selection_panel, "◆ 현재 영역 PNG 내보내기  ⌘E", self.save_crop).pack(
+        self._button(selection_panel, "◆ 현재 영역 PNG", self.save_crop).pack(
             side=tk.TOP,
             fill=tk.X,
             pady=(0, 4),
         )
-        self._button(selection_panel, "◆ 대기 영역 모두 내보내기  ⇧⌘E", self.save_all_crops).pack(
+        self._button(selection_panel, "◆ 대기 영역 모두 PNG", self.save_all_crops).pack(
             side=tk.TOP,
             fill=tk.X,
             pady=(0, 4),
@@ -453,15 +473,15 @@ class ImageCropWindow(tk.Toplevel):
         self._button(selection_panel, "▣ 선택 영역을 캔버스로 적용", self.save_canvas_to_selection).pack(
             side=tk.TOP, fill=tk.X, pady=(0, 4)
         )
-        original_save = self._button(selection_panel, "⬇ 원본 저장  ⌘S", self.save_edited_image)
-        original_save.configure(
-            fg=SELECTED,
-            highlightthickness=1,
-            highlightbackground=SELECTED,
+        original_save = self._button(
+            selection_panel,
+            "⬇ 원본 저장",
+            self.save_edited_image,
+            variant="accent",
         )
         original_save.pack(side=tk.TOP, fill=tk.X)
 
-        self._button(inspector, "닫기  Esc", self.request_close).pack(
+        self._button(inspector, "닫기", self.request_close, variant="ghost").pack(
             side=tk.BOTTOM,
             fill=tk.X,
             pady=(6, 0),
@@ -562,6 +582,7 @@ class ImageCropWindow(tk.Toplevel):
             )
             chip.grid(row=index // 4, column=index % 4, sticky="ew", padx=2, pady=2)
             chip.bind("<Button-1>", lambda _event, value=color: self.set_paint_color(value))
+            attach_tooltip(chip, f"{color}를 현재 페인트 색으로 선택합니다.")
         for column in range(4):
             parent.columnconfigure(column, weight=1)
 
@@ -570,41 +591,35 @@ class ImageCropWindow(tk.Toplevel):
             return ""
         return command()
 
-    def _button(self, parent: tk.Widget, text: str, command, width: int | None = None) -> tk.Button:
-        options = {"width": width} if width is not None else {}
-        button = tk.Button(
+    def _button(
+        self,
+        parent: tk.Widget,
+        text: str,
+        command,
+        width: int | None = None,
+        *,
+        variant: str = "secondary",
+        anchor: str = "center",
+    ) -> ModernButton:
+        button = ModernButton(
             parent,
-            text=text,
-            command=command,
-            bg=BG,
-            fg=TEXT,
-            activebackground=PANEL,
-            activeforeground=TEXT,
-            relief=tk.FLAT,
-            padx=9,
-            pady=3,
-            highlightthickness=0,
-            **options,
+            text,
+            command,
+            width=width,
+            variant=variant,
+            anchor=anchor,
         )
         attach_tooltip(button, tooltip_for_command(command, f"{text} 기능을 실행합니다."))
         return button
 
-    def _tool_button(self, parent: tk.Widget, text: str, command) -> tk.Button:
-        button = tk.Button(
+    def _tool_button(self, parent: tk.Widget, text: str, command) -> ModernButton:
+        button = ModernButton(
             parent,
-            text=text,
-            command=command,
-            bg=BG,
-            fg=TEXT,
-            activebackground=PANEL,
-            activeforeground=TEXT,
-            relief=tk.FLAT,
+            text,
+            command,
             width=8,
             height=2,
-            padx=2,
-            pady=2,
-            highlightthickness=0,
-            justify=tk.CENTER,
+            variant="ghost",
         )
         button.pack(side=tk.TOP, pady=(0, 3))
         attach_tooltip(button, tooltip_for_command(command, f"{text.replace(chr(10), ' ')} 도구입니다."))
@@ -626,23 +641,7 @@ class ImageCropWindow(tk.Toplevel):
     def _refresh_tool_buttons(self) -> None:
         active_tool = self.tool_mode.get()
         for name, button in self.tool_buttons.items():
-            if name == active_tool:
-                button.configure(
-                    bg=BG,
-                    fg=SELECTED,
-                    activebackground=PANEL,
-                    relief=tk.SUNKEN,
-                    highlightthickness=2,
-                    highlightbackground=SELECTED,
-                )
-            else:
-                button.configure(
-                    bg=BG,
-                    fg=TEXT,
-                    activebackground=PANEL,
-                    relief=tk.FLAT,
-                    highlightthickness=0,
-                )
+            button.set_selected(name == active_tool)
         self.tool_hint_var.set(
             {
                 "crop": "선택: 드래그로 크롭 영역 지정",
@@ -758,7 +757,7 @@ class ImageCropWindow(tk.Toplevel):
     def cycle_transparency_background(self) -> str:
         mode = next_transparency_background(self.transparency_background_var.get())
         self.transparency_background_var.set(mode)
-        self.background_button.configure(text=f"▧ 투명 보기: {mode}  D")
+        self.background_button.configure(text=f"▧ 투명 보기: {mode}")
         self._render_image()
         self._show_box_status()
         return "break"
