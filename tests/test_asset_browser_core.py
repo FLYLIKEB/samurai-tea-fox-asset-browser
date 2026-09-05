@@ -412,6 +412,11 @@ class AssetBrowserCoreTest(unittest.TestCase):
         self.assertEqual(core.wheel_scroll_units(-120, 0.0), (1, 0.0))
         self.assertEqual(core.wheel_scroll_units(120, 0.0), (-1, 0.0))
 
+    def test_touchpad_scroll_deltas_decodes_tk9_signed_axes(self) -> None:
+        packed_delta = (2 << 16) | 0xFFFD
+
+        self.assertEqual(core.touchpad_scroll_deltas(packed_delta), (2, -3))
+
     def test_mousewheel_ignores_widgets_outside_the_asset_grid(self) -> None:
         browser = core.AssetBrowser.__new__(core.AssetBrowser)
         calls: list[tuple[int, str]] = []
@@ -459,6 +464,33 @@ class AssetBrowserCoreTest(unittest.TestCase):
 
         self.assertEqual(browser._on_mousewheel(event), "break")
         self.assertEqual(calls, [(3, "units")])
+
+    def test_touchpad_scroll_moves_asset_grid_at_pixel_precision(self) -> None:
+        browser = core.AssetBrowser.__new__(core.AssetBrowser)
+        positions: list[float] = []
+        canvas = type(
+            "Canvas",
+            (),
+            {
+                "bbox": lambda _self, _tag: (0, 0, 800, 2000),
+                "yview": lambda _self: (0.25, 0.75),
+                "yview_moveto": lambda _self, fraction: positions.append(fraction),
+            },
+        )()
+        child = type("Child", (), {"master": canvas})()
+        browser.canvas = canvas
+        browser.drag_selecting = False
+        browser.scroll_select_var = FakeVar(False)
+        browser.after_idle = lambda *_args: self.fail("ordinary scrolling must not select assets")
+        packed_delta = 20
+        event = type(
+            "Event",
+            (),
+            {"widget": child, "delta": packed_delta, "state": 0},
+        )()
+
+        self.assertEqual(browser._on_touchpad_scroll(event), "break")
+        self.assertEqual(positions, [0.24])
 
     def test_render_prompt_template_replaces_known_placeholders(self) -> None:
         prompt = core.render_prompt_template(

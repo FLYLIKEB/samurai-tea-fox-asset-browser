@@ -122,7 +122,7 @@ from asset_browser.style_tokens import (
     upsert_candidate_global_color,
 )
 from asset_browser.ui_app import AssetBrowser
-from asset_browser.ui_layout import wheel_scroll_units
+from asset_browser.ui_layout import touchpad_scroll_deltas, wheel_scroll_units
 
 __all__ = [
     "ART_STYLE_TOKENS_PATH",
@@ -222,6 +222,7 @@ __all__ = [
     "template_path",
     "tile_size_group_label",
     "tile_size_sort_key",
+    "touchpad_scroll_deltas",
     "unique_destination_path",
     "upsert_candidate_biome_color",
     "upsert_candidate_global_color",

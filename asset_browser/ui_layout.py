@@ -31,6 +31,18 @@ def wheel_scroll_units(delta: float, remainder: float) -> tuple[int, float]:
     units = int(amount)
     return units, amount - units
 
+
+def touchpad_scroll_deltas(packed_delta: int) -> tuple[int, int]:
+    """Decode Tk 9 TouchpadScroll's packed signed 16-bit X/Y deltas."""
+    value = packed_delta & 0xFFFFFFFF
+    delta_x = (value >> 16) & 0xFFFF
+    delta_y = value & 0xFFFF
+    if delta_x >= 0x8000:
+        delta_x -= 0x10000
+    if delta_y >= 0x8000:
+        delta_y -= 0x10000
+    return delta_x, delta_y
+
 class LayoutMixin:
     def _build_ui(self) -> None:
         style = ttk.Style(self)
@@ -318,6 +330,11 @@ class LayoutMixin:
         self.grid_frame.bind("<Configure>", self._update_scroll_region)
         self.canvas.bind("<Configure>", self._resize_grid_window)
         self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+        try:
+            self.canvas.bind_all("<TouchpadScroll>", self._on_touchpad_scroll)
+        except tk.TclError:
+            # Tk 8.6 does not define TouchpadScroll; MouseWheel remains active.
+            pass
         self.canvas.bind_all("<Button-4>", self._on_mousewheel)
         self.canvas.bind_all("<Button-5>", self._on_mousewheel)
         self.bind_all("<ButtonRelease-1>", self.end_drag_selection, add="+")
@@ -588,6 +605,20 @@ class LayoutMixin:
 
         if units:
             self.canvas.yview_scroll(units * 3, "units")
+            if self.drag_selecting or self.scroll_select_var.get() or getattr(event, "state", 0) & 0x0001:
+                self.after_idle(self.select_visible_images)
+        return "break"
+
+    def _on_touchpad_scroll(self, event: tk.Event) -> str:
+        if not self._event_targets_asset_grid(event):
+            return ""
+
+        _delta_x, delta_y = touchpad_scroll_deltas(int(event.delta))
+        bounds = self.canvas.bbox("all")
+        if delta_y and bounds is not None:
+            content_height = max(1, bounds[3] - bounds[1])
+            top_fraction = self.canvas.yview()[0]
+            self.canvas.yview_moveto(top_fraction - delta_y / content_height)
             if self.drag_selecting or self.scroll_select_var.get() or getattr(event, "state", 0) & 0x0001:
                 self.after_idle(self.select_visible_images)
         return "break"
