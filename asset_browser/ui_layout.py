@@ -596,6 +596,14 @@ class LayoutMixin:
             if widget is self.canvas:
                 return True
             widget = getattr(widget, "master", None)
+        return self._pointer_is_over_asset_grid()
+
+    def _pointer_is_over_asset_grid(self) -> bool:
+        widget = self.winfo_containing(self.winfo_pointerx(), self.winfo_pointery())
+        while widget is not None:
+            if widget is self.canvas:
+                return True
+            widget = getattr(widget, "master", None)
         return False
 
     def autoscroll_during_drag(self, event: tk.Event) -> None:

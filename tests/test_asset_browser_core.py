@@ -410,6 +410,9 @@ class AssetBrowserCoreTest(unittest.TestCase):
         browser = core.AssetBrowser.__new__(core.AssetBrowser)
         calls: list[tuple[int, str]] = []
         browser.canvas = object()
+        browser.winfo_pointerx = lambda: 0
+        browser.winfo_pointery = lambda: 0
+        browser.winfo_containing = lambda *_args: None
         browser.scroll_remainder = 0.0
         browser.drag_selecting = False
         browser.scroll_select_var = FakeVar(False)
@@ -418,6 +421,23 @@ class AssetBrowserCoreTest(unittest.TestCase):
 
         self.assertEqual(browser._on_mousewheel(event), "")
         self.assertEqual(calls, [])
+
+    def test_mousewheel_accepts_trackpad_event_when_pointer_is_over_the_grid(self) -> None:
+        browser = core.AssetBrowser.__new__(core.AssetBrowser)
+        calls: list[tuple[int, str]] = []
+        canvas = type("Canvas", (), {"yview_scroll": lambda _self, units, kind: calls.append((units, kind))})()
+        browser.canvas = canvas
+        browser.winfo_pointerx = lambda: 100
+        browser.winfo_pointery = lambda: 200
+        browser.winfo_containing = lambda *_args: canvas
+        browser.scroll_remainder = 0.0
+        browser.drag_selecting = False
+        browser.scroll_select_var = FakeVar(False)
+        browser.after_idle = lambda *_args: self.fail("ordinary scrolling must not select assets")
+        event = type("Event", (), {"widget": object(), "num": None, "delta": -1, "state": 0})()
+
+        self.assertEqual(browser._on_mousewheel(event), "break")
+        self.assertEqual(calls, [(3, "units")])
 
     def test_mousewheel_scrolls_asset_grid_children_by_three_units(self) -> None:
         browser = core.AssetBrowser.__new__(core.AssetBrowser)
