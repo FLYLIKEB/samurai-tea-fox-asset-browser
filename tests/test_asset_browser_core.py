@@ -141,8 +141,11 @@ class AssetBrowserCoreTest(unittest.TestCase):
 
         self.assertEqual(scaled_size(None, 32, 32, core.PREVIEW_SCALE), (64, 64))
         self.assertEqual(scaled_size(None, 32, 64, core.PREVIEW_SCALE), (64, 128))
-        self.assertEqual(scaled_size(None, 64, 64, core.PREVIEW_SCALE), (104, 104))
-        self.assertEqual(scaled_size(None, 32, 128, core.PREVIEW_SCALE), (26, 104))
+        self.assertEqual(scaled_size(None, 64, 64, core.PREVIEW_SCALE), (96, 96))
+        self.assertEqual(scaled_size(None, 32, 128, core.PREVIEW_SCALE), (24, 96))
+
+    def test_cell_size_for_32px_asset_uses_dense_grid(self) -> None:
+        self.assertEqual(core.cell_size_for_preview((64, 64)), (98, 106))
 
     def test_fit_size_within_preserves_aspect_ratio(self) -> None:
         self.assertEqual(core.fit_size_within((64, 64), (104, 104)), (104, 104))
@@ -294,6 +297,36 @@ class AssetBrowserCoreTest(unittest.TestCase):
         self.assertEqual(browser.expanded_group_labels, set())
         self.assertEqual(browser.default_expanded_group_labels, set())
         self.assertIn("/project/assets/sprites/enemies", browser.status_var.get())
+
+    def test_navigate_to_parent_folder_moves_up_one_level(self) -> None:
+        browser = core.AssetBrowser.__new__(core.AssetBrowser)
+        browser.project_root = Path("/project")
+        browser.path_var = FakeVar("/project/assets/sprites/enemies")
+        browser.filter_var = FakeVar("oni")
+        browser.expanded_group_labels = {"enemies / 32x32"}
+        browser.default_expanded_group_labels = {"enemies / 32x32"}
+        browser.status_var = FakeVar("")
+        rescans: list[Path] = []
+        browser.rescan = lambda: rescans.append(Path(browser.path_var.get()))
+
+        result = browser.navigate_to_parent_folder()
+
+        self.assertEqual(result, "break")
+        self.assertEqual(rescans, [Path("/project/assets/sprites")])
+        self.assertEqual(browser.filter_var.get(), "")
+        self.assertIn("상위 폴더로 이동", browser.status_var.get())
+
+    def test_navigate_to_parent_folder_stays_at_filesystem_root(self) -> None:
+        browser = core.AssetBrowser.__new__(core.AssetBrowser)
+        browser.project_root = Path("/")
+        browser.path_var = FakeVar("/")
+        browser.status_var = FakeVar("")
+        browser.navigate_to_asset_folder = lambda _folder: self.fail("root must not navigate")
+
+        result = browser.navigate_to_parent_folder()
+
+        self.assertEqual(result, "break")
+        self.assertIn("최상위 폴더", browser.status_var.get())
 
     def test_palette_conversion_targets_selected_assets_only(self) -> None:
         browser = core.AssetBrowser.__new__(core.AssetBrowser)

@@ -49,22 +49,25 @@ class LayoutMixin:
         style.configure("TNotebook", background=PANEL, borderwidth=0)
         style.configure("TNotebook.Tab", padding=(12, 5))
 
-        toolbar = tk.Frame(self, bg=PANEL, padx=8, pady=5)
+        toolbar = tk.Frame(self, bg=PANEL, padx=6, pady=4)
         toolbar.pack(side=tk.TOP, fill=tk.X)
 
         path_entry = tk.Entry(toolbar, textvariable=self.path_var, bg=BG, fg=TEXT, relief=tk.FLAT)
         path_entry.grid(row=0, column=0, sticky="ew", padx=(0, 6))
 
-        self._button(toolbar, "⌕ 찾기 (⌘O)", self.choose_root).grid(row=0, column=1, padx=1)
-        self._button(toolbar, "↻ 새로고침 (⌘R)", self.rescan).grid(row=0, column=2, padx=1)
-        self._button(toolbar, "⌂ Finder (⌘F)", self.reveal_asset_root).grid(
-            row=0, column=3, padx=1
+        self._button(toolbar, "↑ 상위 (⌘↑)", self.navigate_to_parent_folder).grid(
+            row=0, column=1, padx=1
         )
-        self._button(toolbar, "▾ 펼침 (⌘U)", self.expand_all_groups).grid(
+        self._button(toolbar, "⌕ 찾기 (⌘O)", self.choose_root).grid(row=0, column=2, padx=1)
+        self._button(toolbar, "↻ 새로고침 (⌘R)", self.rescan).grid(row=0, column=3, padx=1)
+        self._button(toolbar, "⌂ Finder (⌘F)", self.reveal_asset_root).grid(
             row=0, column=4, padx=1
         )
+        self._button(toolbar, "▾ 펼침 (⌘U)", self.expand_all_groups).grid(
+            row=0, column=5, padx=1
+        )
         self._button(toolbar, "▸ 접기 (⌘J)", self.collapse_all_groups).grid(
-            row=0, column=5, padx=(1, 8)
+            row=0, column=6, padx=(1, 6)
         )
         filter_entry = tk.Entry(
             toolbar,
@@ -74,16 +77,16 @@ class LayoutMixin:
             relief=tk.FLAT,
             insertbackground=TEXT,
         )
-        filter_entry.grid(row=0, column=6, sticky="ew", padx=(0, 6))
+        filter_entry.grid(row=0, column=7, sticky="ew", padx=(0, 6))
         filter_entry.bind("<KeyRelease>", lambda _event: self.apply_filter())
 
         scale_box = tk.OptionMenu(toolbar, self.scale_var, *SCALE_CHOICES, command=self._scale_changed)
         scale_box.configure(bg=BG, fg=TEXT, activebackground=PANEL, relief=tk.FLAT, width=6)
         scale_box["menu"].configure(bg=BG, fg=TEXT)
-        scale_box.grid(row=0, column=7, padx=(0, 2))
+        scale_box.grid(row=0, column=8, padx=(0, 2))
 
         toolbar.columnconfigure(0, weight=3)
-        toolbar.columnconfigure(6, weight=2)
+        toolbar.columnconfigure(7, weight=2)
 
         self.bottom_panel = tk.Frame(self, bg=PANEL, padx=8, pady=3)
         self.bottom_panel.pack(side=tk.BOTTOM, fill=tk.X)
@@ -115,7 +118,7 @@ class LayoutMixin:
         main_area = tk.Frame(self, bg=BG)
         main_area.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
 
-        left_sidebar = tk.Frame(main_area, bg=BG, padx=8, pady=8, width=220)
+        left_sidebar = tk.Frame(main_area, bg=BG, padx=6, pady=6, width=190)
         left_sidebar.pack(side=tk.LEFT, fill=tk.Y)
         left_sidebar.pack_propagate(False)
 
@@ -192,14 +195,14 @@ class LayoutMixin:
 
         self.canvas = tk.Canvas(image_area, bg=BG, highlightthickness=0)
         scrollbar = tk.Scrollbar(image_area, orient=tk.VERTICAL, command=self.canvas.yview)
-        self.grid_frame = tk.Frame(self.canvas, bg=BG, padx=10, pady=10)
+        self.grid_frame = tk.Frame(self.canvas, bg=BG, padx=5, pady=5)
 
         self.grid_window = self.canvas.create_window((0, 0), window=self.grid_frame, anchor="nw")
         self.canvas.configure(yscrollcommand=scrollbar.set)
         self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-        right_sidebar = tk.Frame(main_area, bg=BG, padx=8, pady=8, width=270)
+        right_sidebar = tk.Frame(main_area, bg=BG, padx=6, pady=6, width=225)
         right_sidebar.pack(side=tk.RIGHT, fill=tk.Y)
         right_sidebar.pack_propagate(False)
 
@@ -497,8 +500,8 @@ class LayoutMixin:
             activebackground=PANEL,
             activeforeground=TEXT,
             relief=tk.FLAT,
-            padx=8,
-            pady=3,
+            padx=6,
+            pady=2,
             highlightthickness=0,
             highlightbackground=BORDER,
             **options,
@@ -508,12 +511,12 @@ class LayoutMixin:
         group = tk.Frame(
             parent,
             bg=PANEL,
-            padx=7,
-            pady=7,
+            padx=5,
+            pady=5,
             highlightthickness=1,
             highlightbackground=BORDER,
         )
-        group.pack(side=tk.TOP, fill=tk.X, pady=(0, 8))
+        group.pack(side=tk.TOP, fill=tk.X, pady=(0, 6))
         tk.Label(
             group,
             text=label,
@@ -521,7 +524,7 @@ class LayoutMixin:
             fg=MUTED,
             anchor="w",
             font=("TkDefaultFont", 9, "bold"),
-        ).pack(side=tk.TOP, fill=tk.X, pady=(0, 6))
+        ).pack(side=tk.TOP, fill=tk.X, pady=(0, 4))
         return group
 
     def toggle_bottom_panel(self) -> None:
@@ -537,6 +540,7 @@ class LayoutMixin:
             self.bottom_toggle_button.configure(text="▴ 작업 패널 (⌘W)")
 
     def _bind_shortcuts(self) -> None:
+        self._shortcut("<Command-Up>", self.navigate_to_parent_folder)
         self._shortcut("<Command-o>", self.choose_root)
         self._shortcut("<Command-r>", self.rescan)
         self._shortcut("<Command-f>", self.reveal_asset_root)
@@ -580,7 +584,7 @@ class LayoutMixin:
         widget = event.widget
         if isinstance(widget, tk.Text):
             return True
-        if isinstance(widget, tk.Entry) and event.keysym not in {"Escape"}:
+        if isinstance(widget, tk.Entry) and event.keysym not in {"Escape", "Up"}:
             return True
         return False
 

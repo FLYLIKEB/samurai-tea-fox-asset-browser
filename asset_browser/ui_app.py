@@ -155,12 +155,12 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         header = tk.Frame(
             self.grid_frame,
             bg=PANEL,
-            padx=8,
-            pady=5,
+            padx=6,
+            pady=3,
             highlightthickness=1,
             highlightbackground=BORDER,
         )
-        header.grid(row=row, column=0, columnspan=columns, sticky="ew", padx=3, pady=(10, 2))
+        header.grid(row=row, column=0, columnspan=columns, sticky="ew", padx=2, pady=(6, 1))
 
         icon = "▾" if expanded else "▸"
         transparency_summary = self.transparency_summary(images)
@@ -180,7 +180,7 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
                 header,
                 "↪ 폴더",
                 lambda target=folder: self.navigate_to_asset_folder(target),
-            ).pack(side=tk.LEFT, padx=(8, 0))
+            ).pack(side=tk.LEFT, padx=(6, 0))
         summary = tk.Label(
             header,
             text=f"{len(images)}개 | {transparency_summary}",
@@ -277,14 +277,14 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         cell = tk.Frame(
             self.grid_frame,
             bg=bg,
-            padx=4,
-            pady=4,
+            padx=2,
+            pady=2,
             highlightthickness=1,
             highlightbackground=SELECTED if is_selected else BORDER,
             width=cell_width,
             height=cell_height,
         )
-        cell.grid(row=row, column=column, padx=3, pady=3, sticky="n")
+        cell.grid(row=row, column=column, padx=2, pady=2, sticky="n")
         cell.grid_propagate(False)
 
         image_box = tk.Frame(
@@ -319,7 +319,7 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
             text=self._short_name(item.relative_path.name),
             bg=bg,
             fg=fg,
-            wraplength=max(124, cell_width - 8),
+            wraplength=max(92, cell_width - 6),
             justify=tk.CENTER,
             height=1,
             font=("TkDefaultFont", 10),
@@ -331,7 +331,7 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
             text=meta,
             bg=bg,
             fg=meta_fg,
-            wraplength=max(124, cell_width - 8),
+            wraplength=max(92, cell_width - 6),
             justify=tk.CENTER,
             font=("TkDefaultFont", 9),
             height=1,

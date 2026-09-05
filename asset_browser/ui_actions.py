@@ -169,6 +169,22 @@ class ActionsMixin:
         self.status_var.set(f"폴더로 이동: {target}")
         return "break"
 
+    def navigate_to_parent_folder(self) -> str:
+        current = Path(self.path_var.get()).expanduser()
+        if not current.is_absolute():
+            current = (self.project_root / current).resolve()
+        else:
+            current = current.resolve()
+
+        parent = current.parent
+        if parent == current:
+            self.status_var.set("이미 최상위 폴더입니다.")
+            return "break"
+
+        self.navigate_to_asset_folder(parent)
+        self.status_var.set(f"상위 폴더로 이동: {parent}")
+        return "break"
+
     def schedule_toggle_selection(self, asset: AssetImage) -> str:
         if time.monotonic() < self.suppress_single_click_until:
             return "break"

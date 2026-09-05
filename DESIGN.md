@@ -2,7 +2,7 @@
 
 ## Source of truth
 - Status: Active
-- Last refreshed: 2026-09-01
+- Last refreshed: 2026-09-05
 - Primary product surfaces: Tkinter asset grid, image detail/crop editor, prompt/style bottom panel.
 - Evidence reviewed: `README.md`, `asset_browser/constants.py`, `asset_browser/ui_layout.py`, `asset_browser/ui_app.py`, `asset_browser/crop_window.py`.
 
@@ -34,14 +34,14 @@
 ## Visual language
 - Color: Mostly neutral app chrome with existing teal selection color.
 - Typography: Tk default fonts, compact labels, Korean UI text.
-- Spacing/layout rhythm: Small fixed groups, stable cell sizes, no layout shift on selection.
+- Spacing/layout rhythm: Small fixed groups, stable cell sizes, no layout shift on selection. 32x32 에셋은 한 화면에 더 많이 보이도록 셀과 사이드바 여백을 최소화한다.
 - Shape/radius/elevation: Flat Tk controls, thin borders only where they clarify sections.
 - Motion: None.
 - Imagery/iconography: Text plus simple symbols for commands; pixel previews use nearest scaling and large assets keep aspect ratio in thumbnail bounds.
 
 ## Components
 - Existing components to reuse: `_button`, fixed grid cells, grouped headers, bottom panel tabs.
-- New/changed components: Main side action panels, image editor tool rail, image editor inspector panel.
+- New/changed components: Main side action panels, image editor tool rail, image editor inspector panel, 현재 스캔 경로의 상위 폴더 이동 버튼.
 - Variants and states: Selected tool, dirty edit status, line preview, transparent/opaque asset badge.
 - Token/component ownership: `asset_browser/constants.py` owns colors; layout modules own placement.
 
@@ -54,7 +54,7 @@
 
 ## Responsive behavior
 - Supported breakpoints/devices: macOS desktop windows down to the app min sizes.
-- Layout adaptations: Main browser uses left/right side panels; image detail keeps tool rail and inspector fixed.
+- Layout adaptations: Main browser uses narrower left/right side panels so the asset canvas retains priority; image detail keeps tool rail and inspector fixed.
 - Touch/hover differences: Optimized for mouse/trackpad and keyboard.
 
 ## Interaction states

@@ -6,7 +6,7 @@ BASE_TILE_SIZE = 32
 PREVIEW_SCALE = 2
 SUMMARY_THRESHOLD = 64
 STRIP_SUMMARY_THRESHOLD = 128
-SUMMARY_PREVIEW_SIZE = (104, 104)
+SUMMARY_PREVIEW_SIZE = (96, 96)
 
 
 def is_summary_size(width: int, height: int) -> bool:
@@ -68,4 +68,4 @@ def preview_size_for_image(size: tuple[int, int] | None, scale: int) -> tuple[in
 
 def cell_size_for_preview(preview_size: tuple[int, int]) -> tuple[int, int]:
     width, height = preview_size
-    return max(132, width + 8), max(112, height + 50)
+    return max(98, width + 6), max(104, height + 42)
