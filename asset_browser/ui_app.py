@@ -84,6 +84,11 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         self.geometry("1360x940")
         self.minsize(1040, 720)
         self.configure(bg=BG)
+        # Bring the editor to the current desktop; launches from a terminal can
+        # otherwise leave the Tk window behind other apps or off-screen.
+        self.update_idletasks()
+        self.lift()
+        self.focus_force()
 
         self._build_ui()
         self.rescan()
@@ -163,6 +168,13 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
             cursor="pointinghand",
         )
         title.pack(side=tk.LEFT)
+        folder = self.folder_path_for_group(images)
+        if folder is not None:
+            self._button(
+                header,
+                "↪ 폴더",
+                lambda target=folder: self.navigate_to_asset_folder(target),
+            ).pack(side=tk.LEFT, padx=(8, 0))
         summary = tk.Label(
             header,
             text=f"{len(images)}개 | 투명 {transparent_count} | 불투명 {len(images) - transparent_count}",
@@ -175,6 +187,11 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         summary.pack(side=tk.RIGHT)
         for widget in (header, title, summary):
             widget.bind("<Button-1>", lambda _event, group_label=label: self.toggle_group(group_label))
+
+    def folder_path_for_group(self, images: list[AssetImage]) -> Path | None:
+        if not images:
+            return None
+        return images[0].path.parent
 
     def current_group_labels(self) -> list[str]:
         return [label for label, _images in self.grouped_images_for_render()]

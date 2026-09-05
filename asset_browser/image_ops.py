@@ -8,10 +8,11 @@ from pathlib import Path
 from .paths import relative_or_name
 
 try:
-    from PIL import Image, ImageEnhance, ImageTk
+    from PIL import Image, ImageEnhance, ImageOps, ImageTk
 except ImportError:  # Pillow is optional; Tk can still load PNG/GIF/PPM/PGM.
     Image = None
     ImageEnhance = None
+    ImageOps = None
     ImageTk = None
 
 def nearest_palette_color(
@@ -152,6 +153,40 @@ def save_cropped_image_to_file(image, target: Path, box: tuple[int, int, int, in
     cropped.save(target)
 
 
+def expand_canvas_to_selection(
+    image,
+    box: tuple[int, int, int, int],
+    fill: tuple[int, int, int, int] = (0, 0, 0, 0),
+):
+    """Make the selected rectangle the canvas, padding transparent pixels as needed."""
+    if Image is None:
+        raise RuntimeError("캔버스 확장에는 Pillow가 필요합니다.")
+    x1, y1, x2, y2 = box
+    if x2 <= x1 or y2 <= y1:
+        raise ValueError("선택 영역의 크기가 올바르지 않습니다.")
+    source = image.convert("RGBA")
+    canvas = Image.new("RGBA", (x2 - x1, y2 - y1), fill)
+    canvas.alpha_composite(source, (-x1, -y1))
+    return canvas
+
+
+def replace_color(image, source_rgb: tuple[int, int, int], target_rgb: tuple[int, int, int], tolerance: int = 0):
+    """Replace every matching visible pixel while preserving alpha."""
+    image = image.convert("RGBA")
+    tolerance = max(0, min(255, tolerance))
+    replaced = []
+    changed = 0
+    for red, green, blue, alpha in image.getdata():
+        if alpha > 0 and color_within_tolerance((red, green, blue), source_rgb, tolerance):
+            replaced.append((*target_rgb, alpha))
+            changed += 1
+        else:
+            replaced.append((red, green, blue, alpha))
+    result = Image.new("RGBA", image.size)
+    result.putdata(replaced)
+    return result, changed
+
+
 def crop_boxes_to_files(
     source: Path,
     boxes: list[tuple[int, int, int, int]],
@@ -215,6 +250,31 @@ def adjust_image(image, kind: str, percent: int):
         "선명도": ImageEnhance.Sharpness,
         "sharpness": ImageEnhance.Sharpness,
     }
+    if kind in ("색조", "hue"):
+        rgba = image.convert("RGBA")
+        alpha = rgba.getchannel("A")
+        hsv = rgba.convert("HSV")
+        shift = int(max(-100, min(300, percent)) * 255 / 100)
+        shifted = hsv.point(lambda value: value)
+        pixels = [( (h + shift) % 256, s, v) for h, s, v in shifted.getdata()]
+        shifted.putdata(pixels)
+        result = shifted.convert("RGBA")
+        result.putalpha(alpha)
+        return result
+    if kind in ("감마", "gamma"):
+        rgba = image.convert("RGBA")
+        alpha = rgba.getchannel("A")
+        gamma = max(0.1, 1.0 - max(-100, min(90, percent)) / 100)
+        lut = [min(255, max(0, int((i / 255.0) ** gamma * 255))) for i in range(256)]
+        result = rgba.convert("RGB").point(lut * 3).convert("RGBA")
+        result.putalpha(alpha)
+        return result
+    if kind in ("색상화", "colorize"):
+        rgba = image.convert("RGBA")
+        alpha = rgba.getchannel("A")
+        result = ImageOps.colorize(rgba.convert("L"), black="#101018", white="#f0b84b").convert("RGBA")
+        result.putalpha(alpha)
+        return result
     enhancer_class = enhancer_by_kind.get(kind)
     if enhancer_class is None:
         raise ValueError(f"지원하지 않는 보정입니다: {kind}")

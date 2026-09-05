@@ -5,6 +5,17 @@ import unittest
 from pathlib import Path
 
 from asset_browser import asset_browser as core
+from asset_browser import ui_actions
+
+class FakeVar:
+    def __init__(self, value=None) -> None:
+        self.value = value
+
+    def get(self):
+        return self.value
+
+    def set(self, value) -> None:
+        self.value = value
 
 class AssetBrowserCoreTest(unittest.TestCase):
     def test_parse_args_defaults_to_2x_scale(self) -> None:
@@ -139,6 +150,24 @@ class AssetBrowserCoreTest(unittest.TestCase):
         self.assertEqual(composited.getpixel((0, 0)), (10, 20, 30, 255))
         self.assertEqual(composited.getpixel((1, 0)), (0, 0, 0, 255))
 
+    @unittest.skipIf(core.Image is None, "Pillow is not installed")
+    def test_replace_color_replaces_all_matching_pixels_and_preserves_alpha(self) -> None:
+        image = core.Image.new("RGBA", (3, 1), (10, 20, 30, 255))
+        image.putpixel((1, 0), (10, 20, 30, 80))
+        image.putpixel((2, 0), (1, 2, 3, 255))
+        replaced, changed = core.replace_color(image, (10, 20, 30), (200, 0, 0))
+        self.assertEqual(changed, 2)
+        self.assertEqual(replaced.getpixel((0, 0)), (200, 0, 0, 255))
+        self.assertEqual(replaced.getpixel((1, 0)), (200, 0, 0, 80))
+
+    @unittest.skipIf(core.Image is None, "Pillow is not installed")
+    def test_expand_canvas_to_selection_pads_and_offsets_source(self) -> None:
+        image = core.Image.new("RGBA", (2, 2), (1, 2, 3, 255))
+        expanded = core.expand_canvas_to_selection(image, (-1, -1, 3, 3))
+        self.assertEqual(expanded.size, (4, 4))
+        self.assertEqual(expanded.getpixel((1, 1)), (1, 2, 3, 255))
+        self.assertEqual(expanded.getpixel((0, 0)), (0, 0, 0, 0))
+
     def test_tile_size_group_labels_large_images_as_summary(self) -> None:
         self.assertEqual(core.tile_size_group_label((32, 32)), "32x32")
         self.assertEqual(core.tile_size_group_label((32, 64)), "32x64")
@@ -217,6 +246,67 @@ class AssetBrowserCoreTest(unittest.TestCase):
 
         self.assertEqual(browser.visible_assets(), [first, second])
 
+    def test_folder_path_for_group_uses_group_image_parent(self) -> None:
+        browser = core.AssetBrowser.__new__(core.AssetBrowser)
+        asset = core.AssetImage(
+            Path("/project/assets/sprites/enemies/oni.png"),
+            Path("assets/sprites/enemies/oni.png"),
+        )
+
+        self.assertEqual(browser.folder_path_for_group([asset]), Path("/project/assets/sprites/enemies"))
+
+    def test_navigate_to_asset_folder_changes_scan_root_and_clears_filter_groups(self) -> None:
+        browser = core.AssetBrowser.__new__(core.AssetBrowser)
+        browser.project_root = Path("/project")
+        browser.path_var = FakeVar("/project/assets/sprites")
+        browser.filter_var = FakeVar("fox")
+        browser.expanded_group_labels = {"sprites / 32x32"}
+        browser.default_expanded_group_labels = {"sprites / 32x32"}
+        browser.status_var = FakeVar("")
+        rescans: list[Path] = []
+        browser.rescan = lambda: rescans.append(Path(browser.path_var.get()))
+
+        result = browser.navigate_to_asset_folder(Path("/project/assets/sprites/enemies"))
+
+        self.assertEqual(result, "break")
+        self.assertEqual(rescans, [Path("/project/assets/sprites/enemies")])
+        self.assertEqual(browser.filter_var.get(), "")
+        self.assertEqual(browser.expanded_group_labels, set())
+        self.assertEqual(browser.default_expanded_group_labels, set())
+        self.assertIn("/project/assets/sprites/enemies", browser.status_var.get())
+
+    def test_palette_conversion_targets_selected_assets_only(self) -> None:
+        browser = core.AssetBrowser.__new__(core.AssetBrowser)
+        selected = core.AssetImage(Path("/project/assets/selected.png"), Path("assets/selected.png"))
+        visible = core.AssetImage(Path("/project/assets/visible.png"), Path("assets/visible.png"))
+        browser.project_root = Path("/project")
+        browser.filtered_images = [selected, visible]
+        browser.art_style_data = {"palette": {"global": [{"hex": "#000000"}]}}
+        browser.selected_palette_candidate_id = lambda: ""
+        browser.selected_assets = lambda: [selected]
+        browser.rescan = lambda: None
+        browser.status_var = FakeVar("")
+
+        calls: list[list[Path]] = []
+        original_apply = ui_actions.apply_palette_to_images
+        original_ask = ui_actions.messagebox.askokcancel
+        original_info = ui_actions.messagebox.showinfo
+        try:
+            ui_actions.apply_palette_to_images = (
+                lambda paths, _palette, _project_root, _backup_root: (calls.append(paths) or (len(paths), []))
+            )
+            ui_actions.messagebox.askokcancel = lambda *_args, **_kwargs: True
+            ui_actions.messagebox.showinfo = lambda *_args, **_kwargs: None
+
+            browser.apply_palette_to_selected_images()
+        finally:
+            ui_actions.apply_palette_to_images = original_apply
+            ui_actions.messagebox.askokcancel = original_ask
+            ui_actions.messagebox.showinfo = original_info
+
+        self.assertEqual(calls, [[selected.path]])
+        self.assertIn("팔레트 실제 변환 완료: 1개", browser.status_var.get())
+
     def test_move_files_to_directory_avoids_name_collisions(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -231,6 +321,63 @@ class AssetBrowserCoreTest(unittest.TestCase):
 
         self.assertEqual(failures, [])
         self.assertEqual([path.name for path in moved], ["fox_2.png"])
+
+    def test_replace_file_keeps_target_name_and_deletes_source(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target = root / "kept_name.png"
+            source = root / "replacement.png"
+            target.write_bytes(b"old")
+            source.write_bytes(b"new")
+
+            core.replace_file_with_and_delete_source(target, source)
+
+            self.assertEqual(target.read_bytes(), b"new")
+            self.assertFalse(source.exists())
+
+    def test_replace_file_rejects_different_extensions_without_modifying_files(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target = root / "kept_name.png"
+            source = root / "replacement.jpg"
+            target.write_bytes(b"old")
+            source.write_bytes(b"new")
+
+            with self.assertRaises(ValueError):
+                core.replace_file_with_and_delete_source(target, source)
+
+            self.assertEqual(target.read_bytes(), b"old")
+            self.assertEqual(source.read_bytes(), b"new")
+
+    def test_godot_sync_runs_project_wide_headless_import(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_root = Path(tmp)
+            (project_root / "project.godot").write_text("[application]\nconfig/name=\"test\"\n", encoding="utf-8")
+            browser = core.AssetBrowser.__new__(core.AssetBrowser)
+            browser.project_root = project_root
+            browser.status_var = FakeVar("")
+            commands: list[list[str]] = []
+            original_run = ui_actions.subprocess.run
+            original_ask = ui_actions.messagebox.askokcancel
+            original_info = ui_actions.messagebox.showinfo
+            try:
+                ui_actions.subprocess.run = lambda command, **_kwargs: (
+                    commands.append(command) or type("Result", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+                )
+                ui_actions.messagebox.askokcancel = lambda *_args, **_kwargs: True
+                ui_actions.messagebox.showinfo = lambda *_args, **_kwargs: None
+
+                browser.sync_all_images_to_godot()
+            finally:
+                ui_actions.subprocess.run = original_run
+                ui_actions.messagebox.askokcancel = original_ask
+                ui_actions.messagebox.showinfo = original_info
+
+            self.assertEqual(
+                commands,
+                [["godot", "--headless", "--path", str(project_root), "--editor", "--quit"]],
+            )
+            self.assertEqual(browser.status_var.get(), "Godot 이미지 메타데이터 전체 반영 완료")
 
     def test_wheel_scroll_units_supports_mac_trackpad_small_delta(self) -> None:
         self.assertEqual(core.wheel_scroll_units(-1, 0.0), (1, 0.0))

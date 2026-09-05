@@ -29,7 +29,11 @@ from asset_browser.constants import (
     SELECTED_TEXT,
     TEXT,
 )
-from asset_browser.file_ops import move_files_to_directory, unique_destination_path
+from asset_browser.file_ops import (
+    move_files_to_directory,
+    replace_file_with_and_delete_source,
+    unique_destination_path,
+)
 from asset_browser.image_ops import (
     Image,
     ImageTk,
@@ -47,6 +51,7 @@ from asset_browser.image_ops import (
     default_resize_output_path,
     draw_pixel_line,
     erase_pixel_line,
+    expand_canvas_to_selection,
     flood_fill_image,
     image_has_transparency,
     image_info,
@@ -59,6 +64,7 @@ from asset_browser.image_ops import (
     make_color_transparent,
     make_edge_connected_color_transparent,
     recolor_image_to_palette,
+    replace_color,
     resize_image_to_file,
     save_color_transparent_image,
     save_cropped_image_to_file,
@@ -160,6 +166,7 @@ __all__ = [
     "default_resize_output_path",
     "draw_pixel_line",
     "erase_pixel_line",
+    "expand_canvas_to_selection",
     "extract_palette_colors",
     "find_images",
     "fit_size_within",
@@ -182,6 +189,7 @@ __all__ = [
     "make_color_transparent",
     "make_edge_connected_color_transparent",
     "move_files_to_directory",
+    "replace_file_with_and_delete_source",
     "nearest_palette_color",
     "normalize_crop_box",
     "normalize_hex_color",
@@ -195,6 +203,7 @@ __all__ = [
     "project_root_from_script",
     "preview_size_for_image",
     "recolor_image_to_palette",
+    "replace_color",
     "relative_or_name",
     "render_prompt_template",
     "resize_image_to_file",

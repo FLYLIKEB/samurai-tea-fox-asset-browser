@@ -16,6 +16,8 @@ from .image_ops import (
     draw_pixel_line,
     erase_pixel_line,
     flood_fill_image,
+    expand_canvas_to_selection,
+    replace_color,
     make_edge_connected_color_transparent,
     normalize_crop_box,
     save_cropped_image_to_file,
@@ -56,6 +58,7 @@ class ImageCropWindow(tk.Toplevel):
         self.image_id: int | None = None
         self.tool_mode = tk.StringVar(value="crop")
         self.paint_color_var = tk.StringVar(value="#2F6F73")
+        self.replace_source_var = tk.StringVar(value="#FFFFFF")
         self.paint_tolerance_var = tk.IntVar(value=0)
         self.edit_dirty = False
         self.last_changed_pixels = 0
@@ -180,6 +183,13 @@ class ImageCropWindow(tk.Toplevel):
             relief=tk.FLAT,
             increment=4,
         ).pack(side=tk.TOP, anchor="w")
+        replace_row = tk.Frame(inspector, bg=PANEL)
+        replace_row.pack(side=tk.TOP, fill=tk.X, pady=(8, 0))
+        tk.Label(replace_row, text="치환할 색", bg=PANEL, fg=MUTED).pack(side=tk.LEFT)
+        tk.Entry(replace_row, textvariable=self.replace_source_var, width=9).pack(side=tk.LEFT, padx=4)
+        self._button(inspector, "↔ 색상 전체 치환", self.replace_all_colors, width=21).pack(
+            side=tk.TOP, fill=tk.X, pady=(4, 0)
+        )
 
         self._section_label(inspector, "크롭", pady=(16, 4))
         self._button(inspector, "□ 32x32 맞춤 (X)", self.fit_32, width=21).pack(
@@ -198,6 +208,9 @@ class ImageCropWindow(tk.Toplevel):
             side=tk.TOP,
             fill=tk.X,
             pady=(0, 4),
+        )
+        self._button(inspector, "▣ 선택 영역으로 캔버스 저장", self.save_canvas_to_selection, width=21).pack(
+            side=tk.TOP, fill=tk.X, pady=(0, 4)
         )
         self._button(inspector, "◆ 대기 모두 저장 (⇧⌘S)", self.save_all_crops, width=21).pack(
             side=tk.TOP,
@@ -626,6 +639,43 @@ class ImageCropWindow(tk.Toplevel):
         if changed:
             self.edit_dirty = True
             self._render_image()
+        self._show_box_status()
+        return "break"
+
+    def replace_all_colors(self) -> str:
+        source = hex_to_rgb(self.replace_source_var.get())
+        target = hex_to_rgb(self.paint_color_var.get())
+        if source is None or target is None:
+            messagebox.showerror("색상 오류", "치환할 색과 대상 색을 #RRGGBB 형식으로 입력하세요.")
+            return "break"
+        self.original, changed = replace_color(self.original, source, target, self.paint_tolerance_var.get())
+        self.last_changed_pixels = changed
+        if changed:
+            self.edit_dirty = True
+            self._render_image()
+        self._show_box_status()
+        return "break"
+
+    def save_canvas_to_selection(self) -> str:
+        if self.box is None:
+            messagebox.showinfo("선택 없음", "캔버스로 사용할 영역을 먼저 선택하세요.")
+            return "break"
+        try:
+            backup_root = paint_backup_root(self.project_root)
+            backup_path = backup_root / relative_or_name(self.asset.path, self.project_root)
+            backup_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(self.asset.path, backup_path)
+            self.original = expand_canvas_to_selection(self.original, self.box)
+            save_rgba_image_to_file(self.original, self.asset.path)
+        except Exception as exc:
+            messagebox.showerror("캔버스 저장 실패", str(exc))
+            return "break"
+        self.image_width, self.image_height = self.original.size
+        self.edit_dirty = False
+        self.last_saved_path = self.asset.path
+        self.on_saved(self.asset.path)
+        self._render_image()
+        self._set_box((0, 0, self.image_width, self.image_height))
         self._show_box_status()
         return "break"
 

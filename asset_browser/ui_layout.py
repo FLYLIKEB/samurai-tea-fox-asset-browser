@@ -144,6 +144,16 @@ class LayoutMixin:
         self._button(file_group, "⇢ 이동 (⌘M)", self.move_selected_images, width=11).pack(
             side=tk.TOP,
             fill=tk.X,
+            pady=(0, 4),
+        )
+        self._button(file_group, "⇄ 파일 교체", self.replace_selected_image_with_file, width=11).pack(
+            side=tk.TOP,
+            fill=tk.X,
+            pady=(0, 4),
+        )
+        self._button(file_group, "⟳ Godot 전체 반영", self.sync_all_images_to_godot, width=16).pack(
+            side=tk.TOP,
+            fill=tk.X,
         )
 
         self._button(copy_group, "⇄ 상대 (⌘1)", self.copy_relative_paths, width=11).pack(
@@ -257,7 +267,7 @@ class LayoutMixin:
             width=11,
         ).pack(side=tk.TOP, fill=tk.X)
 
-        self._button(palette_group, "◩ 실제 변환 (⌘P)", self.apply_palette_to_shown_images, width=16).pack(
+        self._button(palette_group, "◩ 선택 변환 (⌘P)", self.apply_palette_to_selected_images, width=16).pack(
             side=tk.TOP,
             fill=tk.X,
             pady=(0, 4),
@@ -526,7 +536,7 @@ class LayoutMixin:
         self._shortcut("<Command-y>", self.adjust_selected_images)
         self._shortcut("<Command-g>", self.apply_transparency_to_selected_images)
         self._shortcut("<Command-k>", self.choose_transparent_color)
-        self._shortcut("<Command-p>", self.apply_palette_to_shown_images)
+        self._shortcut("<Command-p>", self.apply_palette_to_selected_images)
         self._shortcut("<Command-v>", self.toggle_palette_preview)
         self._shortcut("<Command-e>", self.toggle_scroll_select)
         self._shortcut("<Command-w>", self.toggle_bottom_panel)

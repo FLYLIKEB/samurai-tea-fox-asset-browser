@@ -10,7 +10,7 @@ from tkinter import colorchooser, filedialog, messagebox
 
 from .constants import ART_STYLE_TOKENS_PATH, BUILTIN_PROMPT_TEMPLATE
 from .crop_window import ImageCropWindow
-from .file_ops import move_files_to_directory
+from .file_ops import move_files_to_directory, replace_file_with_and_delete_source
 from .image_ops import (
     Image,
     apply_adjustment_to_images,
@@ -159,6 +159,18 @@ class ActionsMixin:
         self.render_grid()
         self.status_var.set("모든 폴더를 접었습니다.")
 
+    def navigate_to_asset_folder(self, folder: Path) -> str:
+        target = folder.expanduser()
+        if not target.is_absolute():
+            target = (self.project_root / target).resolve()
+        self.path_var.set(str(target))
+        self.filter_var.set("")
+        self.expanded_group_labels.clear()
+        self.default_expanded_group_labels.clear()
+        self.rescan()
+        self.status_var.set(f"폴더로 이동: {target}")
+        return "break"
+
     def schedule_toggle_selection(self, asset: AssetImage) -> str:
         if time.monotonic() < self.suppress_single_click_until:
             return "break"
@@ -235,6 +247,84 @@ class ActionsMixin:
             self._copy_text("\n".join(failures) + "\n", "삭제 실패 목록")
             messagebox.showwarning("일부 삭제 실패", f"{deleted}개 삭제, {len(failures)}개 실패")
         self.status_var.set(f"삭제 완료: {deleted}개")
+
+    def replace_selected_image_with_file(self) -> None:
+        assets = self.selected_assets()
+        if len(assets) != 1:
+            messagebox.showinfo("대상 하나 선택", "바꿀 대상 이미지를 정확히 하나 선택하세요.")
+            return
+
+        target = assets[0]
+        source_name = filedialog.askopenfilename(
+            title="대상 이미지로 교체할 원본 선택",
+            initialdir=str(target.path.parent),
+            filetypes=[("이미지 파일", "*.png *.gif *.jpg *.jpeg *.bmp *.webp *.tga *.tif *.tiff *.ppm *.pgm"), ("모든 파일", "*.*")],
+        )
+        if not source_name:
+            return
+
+        source = Path(source_name)
+        try:
+            if source.resolve() == target.path.resolve():
+                raise ValueError("교체 대상과 원본 파일은 서로 달라야 합니다.")
+            if source.suffix.lower() != target.path.suffix.lower():
+                raise ValueError("교체 대상과 원본의 파일 확장자가 같아야 합니다.")
+        except (OSError, ValueError) as exc:
+            messagebox.showerror("이미지 교체 불가", str(exc))
+            return
+
+        ok = messagebox.askokcancel(
+            "이미지 교체 및 원본 삭제",
+            f"대상 파일명은 유지한 채 이미지 내용을 교체합니다.\n\n"
+            f"대상: {target.relative_path.as_posix()}\n"
+            f"원본: {source}\n\n"
+            "원본 파일은 교체 성공 후 실제 삭제됩니다. 계속할까요?",
+        )
+        if not ok:
+            return
+
+        try:
+            replace_file_with_and_delete_source(target.path, source)
+        except Exception as exc:
+            messagebox.showerror("이미지 교체 실패", str(exc))
+            return
+
+        self.selected.clear()
+        self.rescan()
+        self.status_var.set(f"이미지 교체 완료: {target.relative_path.as_posix()} | 원본 삭제: {source.name}")
+
+    def sync_all_images_to_godot(self) -> None:
+        project_file = self.project_root / "project.godot"
+        if not project_file.is_file():
+            messagebox.showerror("Godot 프로젝트 없음", f"project.godot 파일을 찾을 수 없습니다.\n\n{project_file}")
+            return
+
+        ok = messagebox.askokcancel(
+            "Godot 이미지 메타데이터 전체 반영",
+            "Godot 에디터를 headless로 실행해 프로젝트 전체 에셋을 다시 가져옵니다.\n"
+            "같은 파일명으로 덮어쓴 이미지도 Godot import 메타데이터에 반영됩니다.\n\n계속할까요?",
+        )
+        if not ok:
+            return
+
+        try:
+            result = subprocess.run(
+                ["godot", "--headless", "--path", str(self.project_root), "--editor", "--quit"],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        except OSError as exc:
+            messagebox.showerror("Godot 실행 실패", f"godot 명령을 실행할 수 없습니다.\n\n{exc}")
+            return
+
+        if result.returncode != 0:
+            output = (result.stderr or result.stdout or "출력 없음").strip()
+            messagebox.showerror("Godot 반영 실패", f"종료 코드: {result.returncode}\n\n{output}")
+            return
+
+        self.status_var.set("Godot 이미지 메타데이터 전체 반영 완료")
+        messagebox.showinfo("Godot 반영 완료", "프로젝트 전체 이미지의 변경 메타데이터를 Godot에 반영했습니다.")
 
     def move_selected_images(self) -> None:
         assets = self.selected_assets()
@@ -628,13 +718,14 @@ class ActionsMixin:
         else:
             self._set_status()
 
-    def apply_palette_to_shown_images(self) -> None:
+    def apply_palette_to_selected_images(self) -> None:
         if Image is None:
             messagebox.showerror("Pillow 필요", "실제 이미지 변환에는 Pillow가 필요합니다.")
             return
 
-        if not self.filtered_images:
-            messagebox.showinfo("이미지 없음", "변환할 표시 이미지가 없습니다.")
+        assets = self.selected_assets()
+        if not assets:
+            self._warn_no_selection()
             return
 
         palette = extract_palette_colors(self.art_style_data, self.selected_palette_candidate_id())
@@ -643,18 +734,22 @@ class ActionsMixin:
             return
 
         backup_root = palette_backup_root(self.project_root)
-        count = len(self.filtered_images)
+        count = len(assets)
+        preview = "\n".join(item.relative_path.as_posix() for item in assets[:8])
+        if len(assets) > 8:
+            preview = f"{preview}\n..."
         ok = messagebox.askokcancel(
             "실제 이미지 변환 확인",
-            "현재 화면에 표시된 이미지 전체를 팔레트 색으로 실제 변환합니다.\n\n"
+            "선택한 이미지를 팔레트 색으로 실제 변환합니다.\n\n"
             f"대상: {count}개\n"
+            f"{preview}\n\n"
             f"백업 위치: {backup_root}\n\n"
             "원본 파일이 덮어써집니다. 계속할까요?",
         )
         if not ok:
             return
 
-        paths = [item.path for item in self.filtered_images]
+        paths = [item.path for item in assets]
         converted, failures = apply_palette_to_images(paths, palette, self.project_root, backup_root)
         self.rescan()
         if failures:
@@ -670,3 +765,6 @@ class ActionsMixin:
                 f"{converted}개 이미지를 변환했습니다.\n백업 위치: {backup_root}",
             )
         self.status_var.set(f"팔레트 실제 변환 완료: {converted}개 | 백업: {backup_root}")
+
+    def apply_palette_to_shown_images(self) -> None:
+        self.apply_palette_to_selected_images()
