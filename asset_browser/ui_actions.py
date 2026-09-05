@@ -649,7 +649,7 @@ class ActionsMixin:
         if rgb is None:
             return
         self.transparent_color_var.set(color)
-        self.transparent_color_swatch.configure(bg=color, activebackground=color)
+        self.transparent_color_swatch.configure(bg=color)
 
     def apply_transparency_to_selected_images(self) -> None:
         if Image is None:

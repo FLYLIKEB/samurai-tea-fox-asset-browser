@@ -185,20 +185,19 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
     ) -> None:
         header = tk.Frame(
             self.grid_frame,
-            bg=PANEL,
-            padx=6,
-            pady=3,
-            highlightthickness=1,
-            highlightbackground=BORDER,
+            bg="#e9eff1",
+            padx=9,
+            pady=6,
+            highlightthickness=0,
         )
         indent = 2 + folder.depth * 16
-        header.grid(row=row, column=0, columnspan=columns, sticky="ew", padx=(indent, 2), pady=(5, 1))
+        header.grid(row=row, column=0, columnspan=columns, sticky="ew", padx=(indent, 2), pady=(6, 2))
 
         icon = "▾" if expanded else "▸"
         title = tk.Label(
             header,
             text=f"{icon} 폴더  {folder.name}",
-            bg=PANEL,
+            bg="#e9eff1",
             fg=TEXT,
             anchor="w",
             font=("TkDefaultFont", 10, "bold"),
@@ -207,13 +206,15 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         title.pack(side=tk.LEFT)
         self._button(
             header,
-            "↪ 이 폴더만 보기",
+            "↪ 폴더 열기",
             lambda target=folder.path: self.navigate_to_asset_folder(target),
-        ).pack(side=tk.LEFT, padx=(6, 0))
+            variant="ghost",
+            tooltip="이 폴더만 이미지 탐색 대상으로 열어 목록을 좁힙니다.",
+        ).pack(side=tk.LEFT, padx=(8, 0))
         summary = tk.Label(
             header,
             text=f"하위 포함 {len(folder.descendant_images)}개",
-            bg=PANEL,
+            bg="#e9eff1",
             fg=MUTED,
             anchor="e",
             font=("TkDefaultFont", 9),
@@ -238,11 +239,10 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
     ) -> None:
         header = tk.Frame(
             self.grid_frame,
-            bg=PANEL,
-            padx=6,
-            pady=3,
-            highlightthickness=1,
-            highlightbackground=BORDER,
+            bg=BG,
+            padx=9,
+            pady=5,
+            highlightthickness=0,
         )
         indent = 2 + depth * 16
         header.grid(row=row, column=0, columnspan=columns, sticky="ew", padx=(indent, 2), pady=(2, 1))
@@ -252,7 +252,7 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         title = tk.Label(
             header,
             text=f"{icon} 크기  {size_label}",
-            bg=PANEL,
+            bg=BG,
             fg=TEXT,
             anchor="w",
             font=("TkDefaultFont", 10, "bold"),
@@ -262,7 +262,7 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         summary = tk.Label(
             header,
             text=f"{len(images)}개 | {transparency_summary}",
-            bg=PANEL,
+            bg=BG,
             fg=MUTED,
             anchor="e",
             font=("TkDefaultFont", 9),

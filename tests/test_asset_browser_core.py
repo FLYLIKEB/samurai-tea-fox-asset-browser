@@ -16,6 +16,7 @@ from asset_browser.crop_window import (
     next_zoom_scale,
     opaque_pixel_grid_segments,
 )
+from asset_browser.ui_widgets import BUTTON_HELP, tooltip_for_command
 
 class FakeVar:
     def __init__(self, value=None) -> None:
@@ -28,6 +29,28 @@ class FakeVar:
         self.value = value
 
 class AssetBrowserCoreTest(unittest.TestCase):
+    def test_function_buttons_have_descriptive_tooltip_copy(self) -> None:
+        required_commands = {
+            "navigate_to_parent_folder",
+            "choose_root",
+            "rescan",
+            "select_all",
+            "delete_selected_images",
+            "replace_selected_image_with_file",
+            "sync_all_images_to_godot",
+            "resize_selected_images",
+            "apply_transparency_to_selected_images",
+            "apply_palette_to_selected_images",
+            "adjust_selected_images",
+            "save_edited_image",
+        }
+
+        self.assertTrue(required_commands.issubset(BUTTON_HELP))
+        self.assertEqual(
+            tooltip_for_command(lambda: None, "기능 설명"),
+            "기능 설명",
+        )
+
     def test_parse_args_defaults_to_2x_scale(self) -> None:
         args = core.parse_args([])
 

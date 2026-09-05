@@ -32,6 +32,7 @@ from .models import AssetImage
 from .paths import paint_backup_root, relative_or_name
 from .style_tokens import extract_palette_colors, hex_to_rgb, normalize_hex_color
 from .ui_layout import touchpad_scroll_deltas
+from .ui_widgets import attach_tooltip, tooltip_for_command
 
 MAX_INITIAL_WIDTH = 980
 MAX_INITIAL_HEIGHT = 620
@@ -571,7 +572,7 @@ class ImageCropWindow(tk.Toplevel):
 
     def _button(self, parent: tk.Widget, text: str, command, width: int | None = None) -> tk.Button:
         options = {"width": width} if width is not None else {}
-        return tk.Button(
+        button = tk.Button(
             parent,
             text=text,
             command=command,
@@ -585,6 +586,8 @@ class ImageCropWindow(tk.Toplevel):
             highlightthickness=0,
             **options,
         )
+        attach_tooltip(button, tooltip_for_command(command, f"{text} 기능을 실행합니다."))
+        return button
 
     def _tool_button(self, parent: tk.Widget, text: str, command) -> tk.Button:
         button = tk.Button(
@@ -604,6 +607,7 @@ class ImageCropWindow(tk.Toplevel):
             justify=tk.CENTER,
         )
         button.pack(side=tk.TOP, pady=(0, 3))
+        attach_tooltip(button, tooltip_for_command(command, f"{text.replace(chr(10), ' ')} 도구입니다."))
         return button
 
     def _tool_spacer(self, parent: tk.Widget) -> None:

@@ -45,13 +45,13 @@ GRID_CELL_WIDTH = 98
 GRID_CELL_HEIGHT = 106
 THUMBNAIL_BOX_SIZE = 96
 
-BG = "#f5f5f7"
+BG = "#f4f6f8"
 PANEL = "#ffffff"
-TEXT = "#1d1d1f"
-MUTED = "#86868b"
-SELECTED = "#2f6f73"
+TEXT = "#202830"
+MUTED = "#6f7a85"
+SELECTED = "#176b68"
 SELECTED_TEXT = "#ffffff"
-BORDER = "#d2d2d7"
+BORDER = "#dce2e7"
 ERROR = "#8c3f38"
 
 PROMPT_TEMPLATE_FILE = "default_prompt_template.txt"
