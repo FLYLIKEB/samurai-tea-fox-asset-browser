@@ -227,9 +227,16 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         return f"{folder_label} / {size_label}"
 
     def expand_default_groups(self, groups: dict[str, list[AssetImage]]) -> None:
-        # Do not create all thumbnails on startup. Groups open on demand, or
-        # with the existing toolbar command when the full grid is wanted.
-        _ = groups
+        # Keep one initial group open so the grid has actual scrollable image
+        # content. Opening every 32x32 group was the expensive behavior; the
+        # existing toolbar can still deliberately expand all groups.
+        default_expanded = getattr(self, "default_expanded_group_labels", set())
+        self.default_expanded_group_labels = default_expanded
+        if default_expanded or not groups:
+            return
+        first_label = next(iter(groups))
+        default_expanded.add(first_label)
+        self.expanded_group_labels.add(first_label)
 
     def preview_size_for_group(self, images: list[AssetImage]) -> tuple[int, int]:
         if not images:

@@ -75,7 +75,7 @@ class AssetBrowserCoreTest(unittest.TestCase):
 
         self.assertEqual(browser.current_group_labels(), ["sprites / 32x64", "tiles / 32x32"])
 
-    def test_current_group_labels_starts_groups_collapsed_for_fast_initial_load(self) -> None:
+    def test_current_group_labels_opens_only_first_group_for_fast_initial_load(self) -> None:
         browser = core.AssetBrowser.__new__(core.AssetBrowser)
         browser.project_root = Path("/project")
         browser.asset_root = browser.project_root / "assets"
@@ -94,10 +94,10 @@ class AssetBrowserCoreTest(unittest.TestCase):
 
         browser.current_group_labels()
 
-        self.assertNotIn("sprites / 32x32", browser.expanded_group_labels)
+        self.assertIn("sprites / 32x32", browser.expanded_group_labels)
         self.assertNotIn("sprites / 대형/시트 (64x64 이상)", browser.expanded_group_labels)
 
-    def test_group_can_be_expanded_after_fast_initial_load(self) -> None:
+    def test_default_opened_group_can_be_collapsed(self) -> None:
         browser = core.AssetBrowser.__new__(core.AssetBrowser)
         browser.project_root = Path("/project")
         browser.asset_root = browser.project_root / "assets"
@@ -110,10 +110,11 @@ class AssetBrowserCoreTest(unittest.TestCase):
         browser.expanded_group_labels = set()
         browser.default_expanded_group_labels = set()
 
-        label = browser.current_group_labels()[0]
-        browser.expanded_group_labels.add(label)
+        browser.current_group_labels()
+        browser.expanded_group_labels.remove("sprites / 32x32")
+        browser.current_group_labels()
 
-        self.assertIn("sprites / 32x32", browser.expanded_group_labels)
+        self.assertNotIn("sprites / 32x32", browser.expanded_group_labels)
 
     def test_rescan_reads_size_without_eager_transparency_decoding(self) -> None:
         browser = core.AssetBrowser.__new__(core.AssetBrowser)
