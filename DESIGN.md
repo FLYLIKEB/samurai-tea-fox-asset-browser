@@ -4,7 +4,7 @@
 - Status: Active
 - Last refreshed: 2026-09-05
 - Primary product surfaces: Tkinter asset grid, image detail/crop editor, prompt/style bottom panel.
-- Evidence reviewed: `README.md`, `asset_browser/constants.py`, `asset_browser/ui_layout.py`, `asset_browser/ui_app.py`, `asset_browser/crop_window.py`.
+- Evidence reviewed: `README.md`, `asset_browser/constants.py`, `asset_browser/ui_layout.py`, `asset_browser/ui_app.py`, `asset_browser/crop_window.py`, Aseprite 공식 Workspace·Tool Bar·Keyboard Shortcuts·Sprite Editor 문서.
 
 ## Brand
 - Personality: Quiet local production tool for pixel-art asset maintenance.
@@ -14,7 +14,7 @@
 ## Product goals
 - Goals: Show many assets at once, batch-select quickly, edit/crop sprites without leaving the app.
 - Non-goals: Full replacement for Aseprite or a general image editor.
-- Success signals: Users can distinguish folder/size/transparent state at a glance, including 64x64+ thumbnails, and reach the next action without scanning every button.
+- Success signals: Users can distinguish folder/size/transparent state at a glance, including 64x64+ thumbnails, and 상세 편집에서 현재 도구·줌·미저장 상태와 다음 작업을 즉시 파악한다.
 
 ## Personas and jobs
 - Primary personas: Solo developer/artist using Codex-assisted asset iteration.
@@ -28,11 +28,12 @@
 
 ## Design principles
 - Principle 1: Group buttons by task sequence, not by implementation module.
-- Principle 2: Keep canvas and thumbnails dominant; move secondary operations to side panels instead of stacking them above the grid.
+- Principle 2: Keep canvas and thumbnails dominant; move secondary operations to side panels or tabs instead of stacking them above the grid.
+- Principle 3: Aseprite의 익숙한 `B/E/I/H`, `Space` 임시 이동, 단계별 줌 흐름을 재사용하되 현재 도구에 없는 복잡도는 추가하지 않는다.
 - Tradeoffs: Slightly more visible grouping is acceptable when it reduces accidental destructive edits.
 
 ## Visual language
-- Color: Mostly neutral app chrome with existing teal selection color.
+- Color: Mostly neutral app chrome with existing teal selection color. 상세 편집 캔버스는 어두운 작업 배경과 투명 체커를 사용해 스프라이트 경계를 분리한다.
 - Typography: Tk default fonts, compact labels, Korean UI text.
 - Spacing/layout rhythm: Small fixed groups, stable cell sizes, no layout shift on selection. 32x32 에셋은 한 화면에 더 많이 보이도록 셀과 사이드바 여백을 최소화한다.
 - Shape/radius/elevation: Flat Tk controls, thin borders only where they clarify sections.
@@ -41,13 +42,13 @@
 
 ## Components
 - Existing components to reuse: `_button`, fixed grid cells, grouped headers, bottom panel tabs.
-- New/changed components: Main side action panels, image editor tool rail, image editor inspector panel, 현재 스캔 경로의 상위 폴더 이동 버튼, `-100%`에서 `100%`까지 조정하는 보정 강도 슬라이더, 폴더·하위 폴더·이미지 크기 그룹을 별도로 여닫는 계층형 이미지 목록.
-- Variants and states: Selected tool, dirty edit status, line preview, transparent/opaque asset badge.
+- New/changed components: Main side action panels, image editor tool rail, 상단 문서·실행 취소·줌 바, `색상`/`선택·저장` 탭 인스펙터, 현재 스캔 경로의 상위 폴더 이동 버튼, `-100%`에서 `100%`까지 조정하는 보정 강도 슬라이더, 폴더·하위 폴더·이미지 크기 그룹을 별도로 여닫는 계층형 이미지 목록.
+- Variants and states: Selected tool, dirty edit status, undo/redo availability, zoom and pixel-grid state, line preview, transparent/opaque asset badge.
 - Token/component ownership: `asset_browser/constants.py` owns colors; layout modules own placement.
 
 ## Accessibility
 - Target standard: Keyboard-accessible local desktop utility.
-- Keyboard/focus behavior: Every common button displays its shortcut in the label.
+- Keyboard/focus behavior: Every common button displays its shortcut in the label. 텍스트 입력에 포커스가 있을 때는 캔버스 도구 단축키를 적용하지 않는다.
 - Contrast/readability: Neutral backgrounds with dark text and visible selected states.
 - Screen-reader semantics: Tk labels/buttons remain native widgets.
 - Reduced motion and sensory considerations: No animation.
@@ -60,7 +61,7 @@
 ## Interaction states
 - Loading: Status bar and empty grid message.
 - Empty: Grid shows Korean empty-state text.
-- Error: Dialogs for destructive or failed file actions.
+- Error: Dialogs for destructive or failed file actions; 미저장 편집창을 닫을 때 저장·폐기·취소를 선택한다.
 - Success: Status bar reports saved/copied/converted result.
 - Disabled: Prefer no-op plus status/dialog over hidden actions.
 - Offline/slow network, if applicable: Not applicable.

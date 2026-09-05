@@ -6,6 +6,7 @@ from pathlib import Path
 
 from asset_browser import asset_browser as core
 from asset_browser import ui_actions
+from asset_browser.crop_window import ImageCropWindow, next_zoom_scale
 
 class FakeVar:
     def __init__(self, value=None) -> None:
@@ -191,6 +192,36 @@ class AssetBrowserCoreTest(unittest.TestCase):
         self.assertEqual(core.fit_size_within((64, 64), (104, 104)), (104, 104))
         self.assertEqual(core.fit_size_within((256, 128), (104, 104)), (104, 52))
         self.assertEqual(core.fit_size_within((32, 128), (104, 104)), (26, 104))
+
+    def test_editor_zoom_steps_match_pixel_art_workflow(self) -> None:
+        self.assertEqual(next_zoom_scale(1.0, 1), 2.0)
+        self.assertEqual(next_zoom_scale(8.0, -1), 4.0)
+        self.assertEqual(next_zoom_scale(32.0, 1), 32.0)
+        self.assertEqual(next_zoom_scale(0.25, -1), 0.25)
+
+    @unittest.skipIf(core.Image is None, "Pillow is not installed")
+    def test_editor_undo_and_redo_restore_image_snapshots(self) -> None:
+        before = core.Image.new("RGBA", (2, 2), (0, 0, 0, 0))
+        after = core.Image.new("RGBA", (2, 2), (255, 0, 0, 255))
+        editor = ImageCropWindow.__new__(ImageCropWindow)
+        editor.original = after.copy()
+        editor.image_width = 2
+        editor.image_height = 2
+        editor.undo_stack = [before.copy()]
+        editor.redo_stack = []
+        editor.edit_dirty = False
+        editor.last_changed_pixels = 4
+        editor.box = None
+        editor._render_image = lambda: None
+        editor._refresh_history_buttons = lambda: None
+        editor._show_box_status = lambda: None
+
+        editor.undo()
+        self.assertEqual(editor.original.getpixel((0, 0)), (0, 0, 0, 0))
+        self.assertTrue(editor.edit_dirty)
+
+        editor.redo()
+        self.assertEqual(editor.original.getpixel((0, 0)), (255, 0, 0, 255))
 
     @unittest.skipIf(core.Image is None, "Pillow is not installed")
     def test_image_info_reports_transparency(self) -> None:
