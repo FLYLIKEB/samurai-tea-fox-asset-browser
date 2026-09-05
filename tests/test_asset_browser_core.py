@@ -403,6 +403,11 @@ class AssetBrowserCoreTest(unittest.TestCase):
         self.assertEqual(core.wheel_scroll_units(-1, 0.0), (1, 0.0))
         self.assertEqual(core.wheel_scroll_units(1, 0.0), (-1, 0.0))
 
+    def test_wheel_scroll_units_accumulates_fractional_trackpad_delta(self) -> None:
+        units, remainder = core.wheel_scroll_units(-0.25, 0.0)
+        self.assertEqual((units, remainder), (0, 0.25))
+        self.assertEqual(core.wheel_scroll_units(-0.75, remainder), (1, 0.0))
+
     def test_wheel_scroll_units_supports_classic_mousewheel_delta(self) -> None:
         self.assertEqual(core.wheel_scroll_units(-120, 0.0), (1, 0.0))
         self.assertEqual(core.wheel_scroll_units(120, 0.0), (-1, 0.0))

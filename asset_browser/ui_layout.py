@@ -18,12 +18,14 @@ from .constants import (
 )
 from .paths import template_path
 
-def wheel_scroll_units(delta: int, remainder: float) -> tuple[int, float]:
+def wheel_scroll_units(delta: float, remainder: float) -> tuple[int, float]:
     if delta == 0:
         return 0, remainder
 
     if abs(delta) < 120:
-        return (-1 if delta > 0 else 1), 0.0
+        amount = remainder - delta
+        units = int(amount)
+        return units, amount - units
 
     amount = remainder + (-delta / 120)
     units = int(amount)
@@ -582,7 +584,7 @@ class LayoutMixin:
         elif event_num == 5:
             units = 1
         else:
-            units, self.scroll_remainder = wheel_scroll_units(int(event.delta), self.scroll_remainder)
+            units, self.scroll_remainder = wheel_scroll_units(event.delta, self.scroll_remainder)
 
         if units:
             self.canvas.yview_scroll(units * 3, "units")
