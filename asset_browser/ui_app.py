@@ -9,7 +9,13 @@ import tkinter as tk
 
 from .constants import BG, BORDER, ERROR, MUTED, PANEL, SELECTED, SELECTED_TEXT, TEXT
 from .constants import GRID_CELL_PITCH
-from .image_ops import Image, ImageTk, composite_on_black_background, recolor_image_to_palette
+from .image_ops import (
+    Image,
+    ImageTk,
+    composite_on_black_background,
+    image_has_transparency,
+    recolor_image_to_palette,
+)
 from .models import AssetImage
 from .prompting import load_prompt_template
 from .scanner import folder_group_label
@@ -157,7 +163,7 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         header.grid(row=row, column=0, columnspan=columns, sticky="ew", padx=3, pady=(10, 2))
 
         icon = "▾" if expanded else "▸"
-        transparent_count = self.transparent_image_count(images)
+        transparency_summary = self.transparency_summary(images)
         title = tk.Label(
             header,
             text=f"{icon} {label}",
@@ -177,7 +183,7 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
             ).pack(side=tk.LEFT, padx=(8, 0))
         summary = tk.Label(
             header,
-            text=f"{len(images)}개 | 투명 {transparent_count} | 불투명 {len(images) - transparent_count}",
+            text=f"{len(images)}개 | {transparency_summary}",
             bg=PANEL,
             fg=MUTED,
             anchor="e",
@@ -221,17 +227,9 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         return f"{folder_label} / {size_label}"
 
     def expand_default_groups(self, groups: dict[str, list[AssetImage]]) -> None:
-        default_expanded = getattr(self, "default_expanded_group_labels", set())
-        self.default_expanded_group_labels = default_expanded
-        for label, images in groups.items():
-            if label in default_expanded:
-                continue
-            if any(
-                tile_size_group_label(self.image_size_by_path.get(image.path)) == "32x32"
-                for image in images
-            ):
-                self.expanded_group_labels.add(label)
-                default_expanded.add(label)
+        # Do not create all thumbnails on startup. Groups open on demand, or
+        # with the existing toolbar command when the full grid is wanted.
+        _ = groups
 
     def preview_size_for_group(self, images: list[AssetImage]) -> tuple[int, int]:
         if not images:
@@ -244,6 +242,13 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
     def transparent_image_count(self, images: list[AssetImage]) -> int:
         transparency_by_path = getattr(self, "image_has_transparency_by_path", {})
         return sum(1 for image in images if transparency_by_path.get(image.path) is True)
+
+    def transparency_summary(self, images: list[AssetImage]) -> str:
+        transparency_by_path = getattr(self, "image_has_transparency_by_path", {})
+        if any(transparency_by_path.get(image.path) is None for image in images):
+            return "투명도 확인 대기"
+        transparent_count = self.transparent_image_count(images)
+        return f"투명 {transparent_count} | 불투명 {len(images) - transparent_count}"
 
     def toggle_group(self, label: str) -> str:
         if label in self.expanded_group_labels:
@@ -435,6 +440,9 @@ class AssetBrowser(LayoutMixin, PalettePanelMixin, ActionsMixin, tk.Tk):
         if Image is not None and ImageTk is not None:
             try:
                 with Image.open(path) as opened:
+                    has_transparency = image_has_transparency(opened)
+                    self.image_has_transparency_by_path[path] = has_transparency
+                    transparency_meta = self._transparency_label(has_transparency)
                     image = opened.convert("RGBA")
                     width, height = image.size
                     tiles_wide = max(1, math.ceil(width / 32))

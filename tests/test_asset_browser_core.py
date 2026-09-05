@@ -75,7 +75,7 @@ class AssetBrowserCoreTest(unittest.TestCase):
 
         self.assertEqual(browser.current_group_labels(), ["sprites / 32x64", "tiles / 32x32"])
 
-    def test_current_group_labels_opens_32x32_groups_by_default(self) -> None:
+    def test_current_group_labels_starts_groups_collapsed_for_fast_initial_load(self) -> None:
         browser = core.AssetBrowser.__new__(core.AssetBrowser)
         browser.project_root = Path("/project")
         browser.asset_root = browser.project_root / "assets"
@@ -94,10 +94,10 @@ class AssetBrowserCoreTest(unittest.TestCase):
 
         browser.current_group_labels()
 
-        self.assertIn("sprites / 32x32", browser.expanded_group_labels)
+        self.assertNotIn("sprites / 32x32", browser.expanded_group_labels)
         self.assertNotIn("sprites / 대형/시트 (64x64 이상)", browser.expanded_group_labels)
 
-    def test_default_opened_32x32_group_can_be_collapsed(self) -> None:
+    def test_group_can_be_expanded_after_fast_initial_load(self) -> None:
         browser = core.AssetBrowser.__new__(core.AssetBrowser)
         browser.project_root = Path("/project")
         browser.asset_root = browser.project_root / "assets"
@@ -110,11 +110,30 @@ class AssetBrowserCoreTest(unittest.TestCase):
         browser.expanded_group_labels = set()
         browser.default_expanded_group_labels = set()
 
-        browser.current_group_labels()
-        browser.expanded_group_labels.remove("sprites / 32x32")
-        browser.current_group_labels()
+        label = browser.current_group_labels()[0]
+        browser.expanded_group_labels.add(label)
 
-        self.assertNotIn("sprites / 32x32", browser.expanded_group_labels)
+        self.assertIn("sprites / 32x32", browser.expanded_group_labels)
+
+    def test_rescan_reads_size_without_eager_transparency_decoding(self) -> None:
+        browser = core.AssetBrowser.__new__(core.AssetBrowser)
+        asset = core.AssetImage(Path("/project/assets/a.png"), Path("assets/a.png"))
+        browser.project_root = Path("/project")
+        browser.path_var = FakeVar("/project/assets")
+        browser.selected = set()
+        browser.apply_filter = lambda: None
+        browser.update_prompt_preview = lambda **_kwargs: None
+        browser._read_image_size = lambda _path: (32, 32)
+        browser._read_image_info = lambda _path: self.fail("rescan must not decode transparency")
+        original_find_images = ui_actions.find_images
+        try:
+            ui_actions.find_images = lambda *_args: [asset]
+            browser.rescan()
+        finally:
+            ui_actions.find_images = original_find_images
+
+        self.assertEqual(browser.image_size_by_path, {asset.path: (32, 32)})
+        self.assertEqual(browser.image_has_transparency_by_path, {asset.path: None})
 
     def test_thumbnail_scale_keeps_32px_assets_at_default_2x(self) -> None:
         scaled_size = core.AssetBrowser._scaled_size

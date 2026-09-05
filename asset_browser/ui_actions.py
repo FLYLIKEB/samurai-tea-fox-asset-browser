@@ -43,13 +43,12 @@ class ActionsMixin:
         self.images = find_images(root, self.project_root)
         self.image_by_path = {item.path: item for item in self.images}
         self.image_order_by_path = {item.path: index for index, item in enumerate(self.images)}
-        image_info_by_path = {item.path: self._read_image_info(item.path) for item in self.images}
+        # Decoding every alpha channel is expensive for large folders. Size is
+        # available from the image header; transparency waits for thumbnail use.
         self.image_size_by_path = {
-            path: info[0] for path, info in image_info_by_path.items()
+            item.path: self._read_image_size(item.path) for item in self.images
         }
-        self.image_has_transparency_by_path = {
-            path: info[1] for path, info in image_info_by_path.items()
-        }
+        self.image_has_transparency_by_path = {item.path: None for item in self.images}
         self.selected = {path for path in self.selected if path in {item.path for item in self.images}}
         self.apply_filter()
         self.update_prompt_preview(force=True)
