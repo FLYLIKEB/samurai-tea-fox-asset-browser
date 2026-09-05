@@ -231,7 +231,31 @@ def resize_image_to_file(source: Path, target: Path, size: tuple[int, int]) -> N
     with Image.open(source) as opened:
         resampling = getattr(Image, "Resampling", Image)
         resized = opened.convert("RGBA").resize(size, resampling.NEAREST)
+        if target.suffix.lower() in {".jpg", ".jpeg"}:
+            resized = resized.convert("RGB")
         resized.save(target)
+
+
+def apply_resize_to_images(
+    image_paths: list[Path],
+    size: tuple[int, int],
+    project_root: Path,
+    backup_root: Path,
+) -> tuple[int, list[str]]:
+    converted = 0
+    failures: list[str] = []
+
+    for path in image_paths:
+        try:
+            backup_path = backup_root / relative_or_name(path, project_root)
+            backup_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(path, backup_path)
+            resize_image_to_file(path, path, size)
+            converted += 1
+        except Exception as exc:
+            failures.append(f"{path}: {exc}")
+
+    return converted, failures
 
 def adjustment_factor(percent: int) -> float:
     return max(0.0, 1.0 + max(-100, min(300, percent)) / 100)

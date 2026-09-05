@@ -15,14 +15,13 @@ from .image_ops import (
     Image,
     apply_adjustment_to_images,
     apply_palette_to_images,
+    apply_resize_to_images,
     apply_transparency_to_images,
-    default_resize_output_path,
     image_info,
     image_size,
     parse_image_size,
-    resize_image_to_file,
 )
-from .paths import adjustment_backup_root, palette_backup_root, template_path
+from .paths import adjustment_backup_root, palette_backup_root, resize_backup_root, template_path
 from .prompting import load_prompt_template, render_prompt_template, save_prompt_template
 from .scanner import find_images
 from .style_tokens import extract_palette_colors, hex_to_rgb, normalize_hex_color
@@ -548,21 +547,34 @@ class ActionsMixin:
             messagebox.showerror("크기 오류", str(exc))
             return
 
-        saved: list[Path] = []
-        failures: list[str] = []
-        for asset in assets:
-            try:
-                target = default_resize_output_path(asset.path, size)
-                resize_image_to_file(asset.path, target, size)
-                saved.append(target)
-            except Exception as exc:
-                failures.append(f"{asset.relative_path.as_posix()}: {exc}")
+        backup_root = resize_backup_root(self.project_root)
+        preview = "\n".join(item.relative_path.as_posix() for item in assets[:8])
+        if len(assets) > 8:
+            preview = f"{preview}\n..."
+        ok = messagebox.askokcancel(
+            "선택 이미지 크기 변경",
+            f"선택한 이미지 {len(assets)}개를 {size[0]}x{size[1]}로 원본 파일에 적용합니다.\n\n"
+            f"{preview}\n\n"
+            f"백업 위치: {backup_root}\n\n"
+            "새 이미지 파일은 만들지 않습니다. 계속할까요?",
+        )
+        if not ok:
+            return
+
+        converted, failures = apply_resize_to_images(
+            [asset.path for asset in assets],
+            size,
+            self.project_root,
+            backup_root,
+        )
 
         self.rescan()
         if failures:
             self._copy_text("\n".join(failures) + "\n", "리사이즈 실패 목록")
-            messagebox.showwarning("일부 리사이즈 실패", f"{len(saved)}개 저장, {len(failures)}개 실패")
-        self.status_var.set(f"리사이즈 저장 완료: {len(saved)}개 | {size[0]}x{size[1]}")
+            messagebox.showwarning("일부 리사이즈 실패", f"{converted}개 변경, {len(failures)}개 실패")
+        self.status_var.set(
+            f"리사이즈 완료: {converted}개 | {size[0]}x{size[1]} | 백업: {backup_root}"
+        )
 
     def adjust_selected_images(self) -> None:
         if Image is None:

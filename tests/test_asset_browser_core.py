@@ -616,6 +616,26 @@ class AssetBrowserCoreTest(unittest.TestCase):
                 self.assertEqual(resized.size, (4, 8))
 
     @unittest.skipIf(core.Image is None, "Pillow is not installed")
+    def test_apply_resize_overwrites_source_and_keeps_a_backup(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            project_root = root / "project"
+            source = project_root / "assets" / "tile.png"
+            backup_root = project_root / "tools" / "asset_browser" / "resize_backups" / "test"
+            source.parent.mkdir(parents=True)
+            core.Image.new("RGBA", (2, 2), (255, 0, 0, 255)).save(source)
+            original = source.read_bytes()
+
+            converted, failures = core.apply_resize_to_images(
+                [source], (4, 8), project_root, backup_root
+            )
+
+            self.assertEqual((converted, failures), (1, []))
+            with core.Image.open(source) as resized:
+                self.assertEqual(resized.size, (4, 8))
+            self.assertEqual((backup_root / "assets" / "tile.png").read_bytes(), original)
+
+    @unittest.skipIf(core.Image is None, "Pillow is not installed")
     def test_make_color_transparent_only_changes_matching_opaque_pixels(self) -> None:
         image = core.Image.new("RGBA", (3, 1))
         image.putdata([(255, 255, 255, 255), (255, 255, 255, 0), (1, 2, 3, 255)])
