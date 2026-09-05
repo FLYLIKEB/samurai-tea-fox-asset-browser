@@ -7,6 +7,11 @@ import shutil
 import tkinter as tk
 from tkinter import colorchooser, messagebox, ttk
 
+try:
+    from PIL import ImageDraw
+except ImportError:  # Pillow is optional until the detailed editor is opened.
+    ImageDraw = None
+
 from .constants import BG, BORDER, MUTED, PANEL, SELECTED, TEXT
 from .image_ops import (
     Image,
@@ -66,11 +71,69 @@ def next_transparency_background(current: str) -> str:
     return TRANSPARENCY_BACKGROUNDS[(index + 1) % len(TRANSPARENCY_BACKGROUNDS)]
 
 
+def opaque_pixel_grid_segments(image) -> list[tuple[int, int, int, int]]:
+    """Return merged source-coordinate grid lines touching painted pixels only."""
+    alpha = image.getchannel("A")
+    pixels = alpha.load()
+    width, height = image.size
+    segments: list[tuple[int, int, int, int]] = []
+
+    for y in range(height + 1):
+        run_start: int | None = None
+        for x in range(width + 1):
+            painted = x < width and (
+                (y > 0 and pixels[x, y - 1] > 0)
+                or (y < height and pixels[x, y] > 0)
+            )
+            if painted and run_start is None:
+                run_start = x
+            elif not painted and run_start is not None:
+                segments.append((run_start, y, x, y))
+                run_start = None
+
+    for x in range(width + 1):
+        run_start = None
+        for y in range(height + 1):
+            painted = y < height and (
+                (x > 0 and pixels[x - 1, y] > 0)
+                or (x < width and pixels[x, y] > 0)
+            )
+            if painted and run_start is None:
+                run_start = y
+            elif not painted and run_start is not None:
+                segments.append((x, run_start, x, y))
+                run_start = None
+
+    return segments
+
+
+def draw_opaque_pixel_grid(preview, source, scale: float):
+    if ImageDraw is None:
+        return preview
+    overlay = Image.new("RGBA", preview.size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+    max_x = preview.size[0] - 1
+    max_y = preview.size[1] - 1
+    for x1, y1, x2, y2 in opaque_pixel_grid_segments(source):
+        draw.line(
+            (
+                min(max_x, int(round(x1 * scale))),
+                min(max_y, int(round(y1 * scale))),
+                min(max_x, int(round(x2 * scale))),
+                min(max_y, int(round(y2 * scale))),
+            ),
+            fill=(0, 0, 0, 96),
+            width=1,
+        )
+    return Image.alpha_composite(preview, overlay)
+
+
 def composite_transparency_preview(
     image,
     display_size: tuple[int, int],
     scale: float,
     mode: str,
+    show_pixel_grid: bool = False,
 ):
     """Render RGBA pixels over a clearly identifiable transparency background."""
     resampling = getattr(Image, "Resampling", Image)
@@ -94,6 +157,8 @@ def composite_transparency_preview(
                         ),
                     )
     background.alpha_composite(displayed)
+    if show_pixel_grid:
+        background = draw_opaque_pixel_grid(background, image, scale)
     return background
 
 
@@ -123,7 +188,6 @@ class ImageCropWindow(tk.Toplevel):
         self.line_preview_id: int | None = None
         self.last_saved_path: Path | None = None
         self.image_id: int | None = None
-        self.pixel_grid_ids: list[int] = []
         self.undo_stack: list = []
         self.redo_stack: list = []
         self.previous_tool_mode: str | None = None
@@ -658,6 +722,11 @@ class ImageCropWindow(tk.Toplevel):
             display_size,
             self.scale,
             self.transparency_background_var.get(),
+            show_pixel_grid=(
+                self.scale >= 8
+                and self.image_width <= 256
+                and self.image_height <= 256
+            ),
         )
         self.preview_ref = ImageTk.PhotoImage(preview)
 
@@ -680,7 +749,6 @@ class ImageCropWindow(tk.Toplevel):
         scroll_height = max(canvas_height, origin_y + display_size[1] + CANVAS_MARGIN)
         self.canvas.configure(scrollregion=(0, 0, scroll_width, scroll_height))
         self._redraw_overlays()
-        self._render_pixel_grid()
         self.zoom_var.set(f"{round(self.scale * 100)}%")
 
     def cycle_transparency_background(self) -> str:
@@ -729,49 +797,6 @@ class ImageCropWindow(tk.Toplevel):
                 self.line_preview_id,
                 *self._display_line_coords(self.line_start, self.line_start),
             )
-
-    def _render_pixel_grid(self) -> None:
-        for line_id in self.pixel_grid_ids:
-            self.canvas.delete(line_id)
-        self.pixel_grid_ids.clear()
-        if self.scale < 8 or self.image_width > 256 or self.image_height > 256:
-            return
-
-        origin_x, origin_y = self.canvas_origin
-        width = self.image_width * self.scale
-        height = self.image_height * self.scale
-        for x in range(self.image_width + 1):
-            screen_x = origin_x + x * self.scale
-            self.pixel_grid_ids.append(
-                self.canvas.create_line(
-                    screen_x,
-                    origin_y,
-                    screen_x,
-                    origin_y + height,
-                    fill="#000000",
-                    stipple="gray50",
-                    tags=("pixel_grid",),
-                )
-            )
-        for y in range(self.image_height + 1):
-            screen_y = origin_y + y * self.scale
-            self.pixel_grid_ids.append(
-                self.canvas.create_line(
-                    origin_x,
-                    screen_y,
-                    origin_x + width,
-                    screen_y,
-                    fill="#000000",
-                    stipple="gray50",
-                    tags=("pixel_grid",),
-                )
-            )
-        if self.image_id is not None:
-            self.canvas.tag_raise("pixel_grid", self.image_id)
-        if self.rect_id is not None:
-            self.canvas.tag_raise(self.rect_id)
-        for rect_id in self.queued_rect_ids:
-            self.canvas.tag_raise(rect_id)
 
     def set_zoom(self, scale: float) -> str:
         scale = max(ZOOM_LEVELS[0], min(ZOOM_LEVELS[-1], float(scale)))

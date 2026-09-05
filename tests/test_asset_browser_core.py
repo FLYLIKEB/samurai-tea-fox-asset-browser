@@ -14,6 +14,7 @@ from asset_browser.crop_window import (
     composite_transparency_preview,
     next_transparency_background,
     next_zoom_scale,
+    opaque_pixel_grid_segments,
 )
 
 class FakeVar:
@@ -229,6 +230,31 @@ class AssetBrowserCoreTest(unittest.TestCase):
         self.assertEqual(preview.getpixel((0, 0)), expected_checker)
         self.assertEqual(preview.getpixel((9, 0)), (240, 20, 30, 255))
         self.assertNotEqual(CHECKER_LIGHT, CHECKER_DARK)
+
+    @unittest.skipIf(core.Image is None, "Pillow is not installed")
+    def test_pixel_grid_has_no_lines_inside_fully_transparent_pixels(self) -> None:
+        image = core.Image.new("RGBA", (2, 1), (0, 0, 0, 0))
+        image.putpixel((1, 0), (240, 20, 30, 255))
+
+        self.assertEqual(
+            set(opaque_pixel_grid_segments(image)),
+            {
+                (1, 0, 2, 0),
+                (1, 1, 2, 1),
+                (1, 0, 1, 1),
+                (2, 0, 2, 1),
+            },
+        )
+
+        preview = composite_transparency_preview(
+            image,
+            (16, 8),
+            8.0,
+            "체커",
+            show_pixel_grid=True,
+        )
+        checker = composite_transparency_preview(image, (16, 8), 8.0, "체커")
+        self.assertEqual(preview.getpixel((4, 4)), checker.getpixel((4, 4)))
 
     @unittest.skipIf(core.Image is None, "Pillow is not installed")
     def test_editor_undo_and_redo_restore_image_snapshots(self) -> None:

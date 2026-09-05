@@ -43,7 +43,7 @@
 ## Components
 - Existing components to reuse: `_button`, fixed grid cells, grouped headers, bottom panel tabs.
 - New/changed components: Main side action panels, image editor tool rail, 상단 문서·실행 취소·줌·투명 보기 바, `색상`/`선택·저장` 탭 인스펙터, 현재 스캔 경로의 상위 폴더 이동 버튼, `-100%`에서 `100%`까지 조정하는 보정 강도 슬라이더, 폴더·하위 폴더·이미지 크기 그룹을 별도로 여닫는 계층형 이미지 목록.
-- Variants and states: Selected tool, dirty edit status, undo/redo availability, zoom and pixel-grid state, `체커`·`밝게`·`어둡게` 투명 배경 보기, line preview, transparent/opaque asset badge.
+- Variants and states: Selected tool, dirty edit status, undo/redo availability, zoom and painted-pixel-only grid state, `체커`·`밝게`·`어둡게` 투명 배경 보기, line preview, transparent/opaque asset badge. 완전히 투명한 픽셀에는 격자선을 표시하지 않는다.
 - Token/component ownership: `asset_browser/constants.py` owns colors; layout modules own placement.
 
 ## Accessibility
